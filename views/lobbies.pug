@@ -1,0 +1,6 @@
+button(id="create-lobby") Create Lobby
+
+ul(class='lobby-list')
+    each lobby in lobbies
+        li(class='lobby-entry', id=lobby.id) Lobby: #{lobby.name}
+            button(class='lobby-button', id=lobby.id+'-button') Join

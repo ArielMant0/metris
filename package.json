@@ -1,0 +1,9 @@
+{
+	"name": "Metris",
+	"description": "Multiplayer Tetris Webb-Application",
+	"author": "Franziska Becker, René Warnking",
+	"dependencies" : {
+		"express": "4.x",
+		"socket.io": "*"
+	}
+}
