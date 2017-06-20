@@ -1,7 +1,7 @@
 var express = require('express')
 ,   app = express()
 ,   server = require('http').createServer(app)
-,   io = require('socket.io')(server)//, {'transports': ['websocket']})
+,   io = require('socket.io')(server) //, {'transports': ['websocket']})
 ,   conf = require('./config.json')
 ,   lobby = require('./room.js')
 
@@ -10,8 +10,10 @@ var last = 0;
 
 // Webserver
 // Use Port X
-var port = process.env.port || conf.port
-server.listen(port);
+var port = process.env.PORT || conf.port
+app.listen(port, function() {
+    console.log('Der Server laeuft nun auf Port' + conf.port);
+});
 
 // Template directory
 app.set('views', './views');
@@ -170,9 +172,6 @@ function joinDefaultGame(socket) {
 function noDefaultPlayer(element, index, array) {
     return element.name !== 'defaultUser';
 }
-
-// Write port to the console
-console.log('Der Server laeuft nun unter http://127.0.0.1:' + conf.port + '/');
 
 // Set all event handlers
 setEventHandlers();

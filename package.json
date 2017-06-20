@@ -4,7 +4,8 @@
 	"description": "Multiplayer Tetris Webb-Application",
 	"author": "Franziska Becker, René Warnking",
 	"engines": {
-		"node": "6.9.1"
+		"node": "6.9.1",
+		"npm": "3.10.8"
 	},
 	"dependencies" : {
 		"express": "4.x",
