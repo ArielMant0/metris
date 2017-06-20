@@ -3,6 +3,9 @@
 	"version": "0.1.0",
 	"description": "Multiplayer Tetris Webb-Application",
 	"author": "Franziska Becker, René Warnking",
+	"engines": {
+		"node": "6.9.1"
+	},
 	"dependencies" : {
 		"express": "4.x",
 		"socket.io": "*"
