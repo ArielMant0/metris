@@ -12,7 +12,7 @@ var last = 0;
 // Use Port X
 var port = process.env.PORT || conf.port
 app.listen(port, function() {
-    console.log('Der Server laeuft nun auf Port' + conf.port);
+    console.log('Der Server laeuft nun auf Port' + port);
 });
 
 // Template directory

@@ -1,22 +1,23 @@
 {
-	"name": "Metris",
-	"version": "0.1.0",
-	"description": "Multiplayer Tetris Webb-Application",
-	"author": "Franziska Becker, René Warnking",
-	"engines": {
-		"node": "6.9.1",
-		"npm": "3.10.8"
-	},
-	"dependencies" : {
-		"express": "4.x",
-		"socket.io": "*"
-	},
-  	"scripts": {
-    	"start": "node server.js"
-	},
-	"repository": {
+  "name": "Metris",
+  "version": "0.1.0",
+  "description": "Multiplayer Tetris Webb-Application",
+  "author": "Franziska Becker, René Warnking",
+  "engines": {
+    "node": "6.9.1",
+    "npm": "3.10.8"
+  },
+  "dependencies": {
+    "express": "4.x",
+    "pug": "2.0.0-rc.2",
+    "socket.io": "2.0.3"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "repository": {
     "type": "git",
     "url": "https://github.com/ArielMant0/metris"
-  	},
-  	"license": "MIT"
+  },
+  "license": "MIT"
 }
