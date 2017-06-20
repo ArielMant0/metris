@@ -10,7 +10,8 @@ var last = 0;
 
 // Webserver
 // Use Port X
-server.listen(conf.port);
+var port = process.env.port || conf.port
+server.listen(port);
 
 // Template directory
 app.set('views', './views');
