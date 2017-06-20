@@ -11,9 +11,7 @@ var last = 0;
 // Webserver
 // Use Port X
 var port = process.env.PORT || conf.port
-app.listen(port, function() {
-    console.log('Der Server laeuft nun auf Port' + port);
-});
+server.listen(port);
 
 // Template directory
 app.set('views', './views');
@@ -172,6 +170,8 @@ function joinDefaultGame(socket) {
 function noDefaultPlayer(element, index, array) {
     return element.name !== 'defaultUser';
 }
+
+console.log('Der Server laeuft nun auf Port ' + port);
 
 // Set all event handlers
 setEventHandlers();
