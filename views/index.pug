@@ -61,9 +61,16 @@ html(lang='en')
                     a(class='active', id='get-lobbies', href='#') Lobbies
                 li
                     a(href='#', id='get-scores') Highscores
-                if inGame
-                    li
-                        a(href='#', id='get-game') Game
+                li
+                    a(href='#', id='get-game') Game
+            span(id='player-name', style='color: white;')
+        section
+            div(class='modal', id='login-modal')
+                div(class='modal-content')
+                    span(class='close' id='close-login-modal') &times;
+                    input(type='text', id='login-name', placeholder='Your Name')
+                    br
+                    button(type='submit', id='submit-login') Login
         section(id='content') Content here ...
         footer
             p Metris

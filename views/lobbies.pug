@@ -1,6 +1,20 @@
-button(id="create-lobby") Create Lobby
+button(id='create-lobby') Create Lobby
+
+div(class='modal', id='create-modal')
+    div(class='modal-content')
+        span(class='close' id='close-create-modal') &times;
+        input(type='text', id='lobby-name', placeholder='Lobby Name')
+        br
+        select(id='field-width')
+            option 30
+            option 40
+        select(id='field-height')
+            option 16
+            option 20
+        br
+        button(type='submit', id='submit-lobby') Create
 
 ul(class='lobby-list')
     each lobby in lobbies
-        li(class='lobby-entry', id=lobby.id) Lobby: #{lobby.name}
-            button(class='lobby-button', id=lobby.id+'-button') Join
+        li(class='lobby-entry', id=lobby.name) Lobby: #{lobby.name}
+            button(class='lobby-button', id=lobby.name+'-button') Join

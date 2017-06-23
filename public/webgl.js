@@ -1,5 +1,6 @@
 var canvas;
 var gl;
+//var scoreContext;
 
 var cubeVerticesBuffer;
 var cubeVerticesTextureCoordBuffer;
@@ -25,13 +26,15 @@ var vertexNormalAttribute;
 var textureCoordAttribute;
 var perspectiveMatrix;
 
-var gameInfo = function() {
-  this.userid = 0;
-  this.lobby = '';
-  this.field_height = 16;
-  this.field_width = 30;
-  this.field = [];
-}
+var gameInfo = {
+  userid: 0,
+  lobby: '',
+  field_height: 16,
+  field_width: 30,
+  field: [],
+  username: '',
+  score: 0
+};
 
 var audio;
 var socket;
@@ -56,10 +59,12 @@ $(document).ready(function () {
 
     socket.on('move', function (data) {
         gameInfo.field = data.field;
+        gameInfo.score = data.score;
     });
 
     socket.on('begin', function (data) {
         gameInfo.field = data.field;
+        gameInfo.score = 0;
         gameRunning = true;
     });
 
@@ -68,21 +73,48 @@ $(document).ready(function () {
         gameInfo.userid = data.id;
         gameInfo.field_width = data.width;
         gameInfo.field_height = data.height;
+        gameInfo.username = data.username;
+    });
+
+    $('#get-lobbies').on('click', function () {
+        audio.pause();
+    });
+
+    $('#get-scores').on('click', function () {
+        audio.pause();
     });
 
     $(document).keydown(function (e) {
-        // Enter
-        // if (!gameRunning && e.which == 13)
-            // startgame();
         // A, E, Q, D, S
         if (gameRunning && (e.which == 65 || e.which == 69 || e.which == 81 || e.which == 68 || e.which == 83))
             submitmove(e.which);
     });
 });
 
+function createLobby(lobby, fwidth, fheight) {
+    if (gameInfo.username)
+        socket.emit('createlobby', { lobbyname: lobby, username: gameInfo.username, width: fwidth, height: fheight });
+}
+
+function setPlayerName(name) {
+    gameInfo.username = name;
+}
+
+function isLoggedIn() {
+    return gameInfo.username !== '';
+}
+
+function isInGame() {
+    return gameInfo.lobby !== '';
+}
+
 // Send player movement
 function submitmove(key) {
     socket.emit('playermove', { key: key, userid: gameInfo.userid, lobbyname: gameInfo.lobby });
+}
+
+function joinGame(lobby) {
+    socket.emit('join', { lobbyname: lobby, username: gameInfo.username });
 }
 
 // Start the game in the current lobby
@@ -137,9 +169,11 @@ function start() {
 function initWebGL() {
 
     gl = null;
+    //scoreContext = null;
 
     try {
-        gl = document.getElementById('glcanvas').getContext("experimental-webgl");
+        gl = document.getElementById('glcanvas').getContext("webgl2");
+        //scoreContext = document.getElementById('scorecanvas').getContext("2d");
 
         window.addEventListener('resize', resizeCanvas, false);
 
@@ -152,6 +186,7 @@ function initWebGL() {
         }
     }
     catch (e) {
+        console.log(e);
     }
 
     // If we don't have a GL context, give up now
@@ -385,6 +420,10 @@ function drawScene() {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+
+    // Clear the score canvas
+    //scoreContext.clearRect(0, 0, scoreContext.canvas.width, scoreContext.canvas.height);
+    //scoreContext.fillText(gameInfo.score, 10, 10);
 
     // Establish the perspective with which we want to view the
     // scene. Our gameInfo.field of view is 45 degrees, with a width/height

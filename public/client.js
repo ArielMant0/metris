@@ -1,6 +1,6 @@
 $(document).ready(function () {
 	setEventListeners();
-	sendAjaxListeners('get', '/lobbies', '#content');
+	sendAjaxListeners('get', '/lobbies', '#content', initLobbyListeners);
 });
 
 function sendAjax(method, url, elem) {
@@ -16,11 +16,11 @@ function sendAjax(method, url, elem) {
 		req.send(body);
 }
 
-function sendAjaxListeners(method, url, elem) {
+function sendAjaxListeners(method, url, elem, func) {
 	var req = new XMLHttpRequest();
 	req.addEventListener('load', function() {
 		document.querySelector(elem).innerHTML = this.responseText;
-		initLobbyListeners(true);
+		func();
 	});
 
 	req.open(method, url);
@@ -30,34 +30,39 @@ function sendAjaxListeners(method, url, elem) {
 		req.send(body);
 }
 
-function sendAjaxLoadGame(method, url, elem) {
-	var req = new XMLHttpRequest();
-	req.addEventListener('load', function() {
-		document.querySelector(elem).innerHTML = this.responseText;
-    	startgame();
-	});
-
-	req.open(method, url);
-	if (method === "get" || method === "GET")
-		req.send();
-	else
-		req.send(body);
-}
-
-function initLobbyListeners(loggedIn) {
-	if (loggedIn && false)
+function initLobbyListeners() {
+	if (isLoggedIn()) {
+		$('.lobby-button').each(function() {
+			$(this).on('click', function () {
+				var lobbyname = $(this).attr('id').split('-')[0];
+				joinGame(lobbyname);
+				loadGame({ data: { gameID: lobbyname }});
+			});
+		});
+		$('#create-lobby').on('click', function() {
+			createLobbyForm();
+		});
+	}
+	else {
 		$('.lobby-button').each(function() {
 			$(this).on('click', joinForm);
 		});
-	else
-		$('.lobby-button').each(function() {
-			$(this).on('click', { gameID: $(this).attr('id').split('-')[0] }, loadGame);
-		});
+		$('#create-lobby').on('click', joinForm);
+	}
+
+	$('#close-create-modal').on('click', function() {
+		$('#create-modal').css('display', 'none');
+	});
+
+	$('#submit-lobby').on('click', function() {
+		createLobby($('#lobby-name').val(), $('#field-width').val(), $('#field-height').val());
+		sendAjaxListeners('get', '/lobbies', '#content', initLobbyListeners);
+	});
 }
 
 function loadLobbies(event) {
 	if ($(this).attr('class') !== 'active') {
-		sendAjaxListeners('get', '/lobbies', '#content');
+		sendAjaxListeners('get', '/lobbies', '#content', initLobbyListeners);
 	}
 }
 
@@ -70,13 +75,18 @@ function loadHighscores(event) {
 // To be called when an identified user joins a game
 function loadGame(event) {
 	if ($(this).attr('class') !== 'active') {
-		sendAjaxLoadGame('get', '/game/' + event.data.gameID, '#content');
+		sendAjaxListeners('get', '/game/' + event.data.gameID, '#content', startgame);
 	}
+}
+
+function createLobbyForm(event) {
+	$('#create-modal').css('display', 'block');
 }
 
 // To be called when a lobby wants to be joined by a non-identified user
 function joinForm(event) {
-	// present a login type form
+	// Display login dialog
+	$('#login-modal').css('display', 'block');
 }
 
 function setEventListeners() {
@@ -96,10 +106,29 @@ function setEventListeners() {
     });
 
     $('#get-game').on('click', function() {
-    	$(this).attr('class', 'active');
-    	$('#get-scores').removeAttr('class');
-    	$('#get-lobbies').removeAttr('class');
-    	var event = { data: { gameID: gameInfo.lobby }};
-    	loadGame(event);
+    	if (isLoggedIn() && isInGame()) {
+	    	$(this).attr('class', 'active');
+	    	$('#get-scores').removeAttr('class');
+	    	$('#get-lobbies').removeAttr('class');
+	    	loadGame({ data: { gameID: gameInfo.lobby }});
+	    } else {
+	    	alert("You need to be logged in and inside a lobby to play!");
+	    }
     });
+
+    // Close dialog on clicking the 'X' button
+	$('#close-login-modal').on('click', function() {
+		$('#login-modal').css('display', 'none');
+	});
+	// Store username on submit
+	$('#submit-login').on('click', function() {
+		if ($('#login-name').val()) {
+			setPlayerName($('#login-name').val());
+			$('#login-modal').css('display', 'none');
+			sendAjaxListeners('get', '/lobbies', '#content', initLobbyListeners);
+		}
+		else {
+			alert("You need to enter a name to play with!");
+		}
+	});
 };

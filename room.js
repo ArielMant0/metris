@@ -22,12 +22,15 @@ module.exports.room = function() {
 		this.name = player;
 	};
 
+	this.score = 0;
+	this.multiplier = 1;
 	this.id = 0;
 	this.name = '';
 	this.players = [];
 	this.stones = [];
 	this.gameover = false;
 	this.gameStarted = false;
+	this.callback;
 
 	this.createRoom = function(roomName, roomID, user) {
 	    // Implement your game room (server side) logic here
@@ -37,6 +40,15 @@ module.exports.room = function() {
 	    	this.addUser(user);
 	    }
 	};
+
+	this.setGameOverCallback = function(func) {
+		this.callback = func;
+	}
+
+	this.callGameOverCallback = function() {
+		if (this.callback)
+			this.callback(this.name, this.score);
+	}
 
 	this.getField = function() {
 		return this.field;
@@ -58,7 +70,7 @@ module.exports.room = function() {
 		return this.gameStarted;
 	}
 
-	this.startGame = function(width=30, height=16) {
+	this.startGame = function(width, height) {
 		this.gameover = false;
 		this.gameStarted = true;
 		this.initField(width, height);
@@ -124,8 +136,8 @@ module.exports.room = function() {
 		for (i = 0; i < this.field_height; i++) {
 			for (j = 0; j < this.field_width; j++) {
 				if (j === this.field_width - 1 && this.field[i * this.field_width + j] != 0) {
-					// socket.to(this.name).emit('music', {});
-	                // Lösche die Zeile und lasse Steine von oben runterfallen
+	                // Delete row and spawn new stones
+	                this.score += this.field_width * this.multiplier;
 	                for (k = 0; k < i; k++) {
 	                	for (l = 0; l < this.field_width; l++) {
 	                		this.field[(i - k) * this.field_width + l] = this.field[((i - k) - 1) * this.field_width + l];
@@ -532,6 +544,7 @@ module.exports.room = function() {
 				if (this.field[i] !== 0 && i !== this.stones[j].pos[0] && i !== this.stones[j].pos[1] && i !== this.stones[j].pos[2] && i !== this.stones[j].pos[3]) {
 					this.gameover = true;
 					this.gameStarted = false;
+					this.callGameOverCallback();
 				}
 			}
 		}
