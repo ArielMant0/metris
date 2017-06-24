@@ -143,7 +143,8 @@ module.exports.room = function() {
 	                this.score += this.field_width * this.multiplier;
 	                for (k = 0; k < i; k++) {
 	                	for (l = 0; l < this.field_width; l++) {
-	                		this.field[(i - k) * this.field_width + l] = this.field[((i - k) - 1) * this.field_width + l];
+	                		if (this.notPlayerStone((i - k) * this.field_width + l))
+	                			this.field[(i - k) * this.field_width + l] = this.field[((i - k) - 1) * this.field_width + l];
 	                	}
 	                }
 	            } else if (this.field[i * this.field_width + j] == 0) {
@@ -158,6 +159,14 @@ module.exports.room = function() {
 	    this.stones[userid].rotation = 1;
 	    // Compute the starting position of the new stone
 	    this.setStartPosition(userid);
+	}
+
+	this.notPlayerStone = function(index) {
+		var stoneid = this.field[index];
+		return stoneid !== this.stones[stoneid].pos[0] &&
+			   stoneid !== this.stones[stoneid].pos[1] &&
+			   stoneid !== this.stones[stoneid].pos[2] &&
+			   stoneid !== this.stones[stoneid].pos[3];
 	}
 
 	this.setStartPosition = function(userid) {
@@ -540,6 +549,8 @@ module.exports.room = function() {
 		// Check if the player's stones reached the bottom
 		for (j = 0; j < this.stones.length; j++) {
 			for (i = 0; i < 4 && this.stones[j].pos[i] !== -1; i++) {
+				// Check if the player's stone is in the last row or one before that and there
+				// is no free space under his stone
 				if ((this.stones[j].pos[i] < (this.field_height - 1) * this.field_width && this.field[this.stones[j].pos[i] + this.field_width] > 0 &&
 					this.stones[j].pos[(i + 1) % 4] !== this.stones[j].pos[i] + this.field_width &&
 					this.stones[j].pos[(i + 2) % 4] !== this.stones[j].pos[i] + this.field_width &&
