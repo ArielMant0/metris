@@ -163,10 +163,10 @@ module.exports.room = function() {
 
 	this.notPlayerStone = function(index) {
 		var stoneid = this.field[index];
-		return stoneid !== this.stones[stoneid].pos[0] &&
-			   stoneid !== this.stones[stoneid].pos[1] &&
-			   stoneid !== this.stones[stoneid].pos[2] &&
-			   stoneid !== this.stones[stoneid].pos[3];
+		return stoneid !== this.stones[stoneid-1].pos[0] &&
+			   stoneid !== this.stones[stoneid-1].pos[1] &&
+			   stoneid !== this.stones[stoneid-1].pos[2] &&
+			   stoneid !== this.stones[stoneid-1].pos[3];
 	}
 
 	this.setStartPosition = function(userid) {
