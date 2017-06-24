@@ -94,15 +94,22 @@ $(document).ready(function () {
 
     socket.on('move', function (data) {
         gameInfo.field = data.field;
-        gameInfo.score = data.score;
-        updateScore();
+        if (data.score != gameInfo.score)
+          updateScore(data.score);
     });
 
     socket.on('begin', function (data) {
         gameInfo.field = data.field;
         gameInfo.score = 0;
         gameRunning = true;
-        updateScore();
+        if (data.score != gameInfo.score)
+          updateScore(data.score);
+    });
+
+    socket.on('gameover', function() {
+        $('#final-score').html('Final Score: ' + gameInfo.score);
+        $('#game-over').css('display', 'block');
+        gameRunning = false;
     });
 
     socket.on('setgameinfo', function(data) {
@@ -124,7 +131,6 @@ $(document).ready(function () {
     $(document).keydown(function (e) {
         // A, E, Q, D, S
         if (gameRunning && (e.which == 65 || e.which == 69 || e.which == 81 || e.which == 68 || e.which == 83)) {
-            console.log("userid: " + gameInfo.userid + ", key: " + e.which);
             submitmove(e.which, gameInfo.userid);
         } else if (gameRunning && e.which == 49) {
             level = 1;
@@ -142,7 +148,8 @@ $(document).ready(function () {
     });
 });
 
-function updateScore() {
+function updateScore(newScore) {
+    gameInfo.score = newScore;
     $('#scoretext').html('Score: ' + gameInfo.score);
 }
 

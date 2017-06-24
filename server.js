@@ -127,8 +127,10 @@ function setEventHandlers() {
 
         // When the game tab needs current game information
         socket.on('udpdategame', function(data) {
-            if (roomlist.has(data.lobbyname))
-                socket.emit('move', { field: roomlist.get(data.lobbyname).field, score: roomlist.get(data.lobbyname).score });
+            if (roomlist.has(data.lobbyname)) {
+                game = roomlist.get(data.lobbyname);
+                socket.emit('move', { field: game.field, score: game.score });
+            }
         });
 
         // When a user pressed a key, move his stone
@@ -136,6 +138,7 @@ function setEventHandlers() {
             if (roomlist.has(data.lobbyname)) {
                 game = roomlist.get(data.lobbyname);
                 game.movestone(data.key, data.userid);
+
                 io.sockets.in(game.name).emit('move', { field: game.field, score: game.score });
             }
     	});
@@ -166,7 +169,7 @@ function setEventHandlers() {
                     socket.emit('setgameinfo', { lobbyname: game.name, id: game.getLastUser(),
                         width: game.field_width, height: game.field_height, username: data.username });
                     // If the game already started tell the player about it
-                    if (game.gameStarted)
+                    if (game.gameStarted && !game.gameover)
                         socket.emit('begin', { field: game.field, score: game.score });
                 });
             }
@@ -185,6 +188,7 @@ function endGame(lobby, score) {
         console.log("Gameover in lobby: " + lobby);
         clearInterval(loops.get(lobby).short);
         clearInterval(loops.get(lobby).long);
+        io.socket.in(lobby).emit('gameover');
     }
 }
 
@@ -195,13 +199,13 @@ function setLoops(game) {
         var l = setInterval(function() {
             if (!game.gameover && game.gameStarted)
                 game.dropStones();
-            io.sockets.in(game.name).emit('move', { field: game.field, score: game.score });
+                io.sockets.in(game.name).emit('move', { field: game.field, score: game.score });
         }, 1000);
 
         var s = setInterval(function () {
             if (!game.gameover && game.gameStarted)
                 game.gamelogic();
-            io.sockets.in(game.name).emit('move', { field: game.field, score: game.score });
+                io.sockets.in(game.name).emit('move', { field: game.field, score: game.score });
         }, 100);
 
         // Store IDs so we can stop intervals once the game is over

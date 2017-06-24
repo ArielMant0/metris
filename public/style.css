@@ -17,6 +17,15 @@ footer p {
     color: white;
 }
 
+#game-over {
+    display: none;
+    position: absolute;
+    left: 40%;
+    top: 40%;
+    color: white;
+    font-weight: bold;
+}
+
 #player-name {
     position: absolute;
     top: 0;

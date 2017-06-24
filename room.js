@@ -37,7 +37,9 @@ module.exports.room = function() {
 	    if (!this.gameStarted && !this.gameover) {
 	    	console.log("Created Lobby: \'" + roomName + "\'");
 	    	this.name = roomName;
-			this.initField(width, height);
+	    	this.field_width = width;
+	    	this.field_height = height;
+			this.initField();
 	    	this.addUser(user);
 	    }
 	};
@@ -51,34 +53,12 @@ module.exports.room = function() {
 			this.callback(this.name, this.score);
 	}
 
-	this.getField = function() {
-		return this.field;
-	};
-
-	this.getWidth = function() {
-		return this.field_width;
-	};
-
-	this.getHeight = function() {
-		return this.field_height;
-	};
-
-	this.getGameover = function() {
-		return this.gameover;
-	};
-
-	this.getGameStarted = function() {
-		return this.gameStarted;
-	}
-
-	this.startGame = function(width, height) {
+	this.startGame = function() {
 		this.gameover = false;
 		this.gameStarted = true;
 	}
 
-	this.initField = function(width, height) {
-		this.field_width = width;
-	    this.field_height = height;
+	this.initField = function() {
 		this.field = new Array(this.field_height * this.field_width);
 		this.field.fill(0);
 	}
@@ -88,12 +68,11 @@ module.exports.room = function() {
 			console.log("Player \'" + user + "\' joined the game \'" + this.name + "\'");
 			this.players.push(new this.player(this.players.length, user));
 			this.stones.push(new this.stone(this.players.length));
-			this.getNewStartPosition(this.stones.length-1);
-			this.stonefinished(this.stones.length-1);
+			this.spawnStone(this.stones.length-1);
 		}
 	}
 
-	this.getNewStartPosition = function(userid) {
+	this.setStartPosition = function(userid) {
 		if (userid !== 0) {
 			if ((userid + 1) % 2 === 0)
 				this.stones[userid].start = -PLAYER_OFFSET * Math.floor((userid + 1) / 2);
@@ -132,29 +111,42 @@ module.exports.room = function() {
 					return i;
 			}
 		}
-
 	}
 
 	this.stonefinished = function(userid) {
-		for (i = 0; i < this.field_height; i++) {
-			for (j = 0; j < this.field_width; j++) {
-				if (j === this.field_width - 1 && this.field[i * this.field_width + j] != 0) {
-	                // Delete row and spawn new stones
-	                this.score += this.field_width * this.multiplier;
-	                for (k = 0; k < i; k++) {
-	                	for (l = 0; l < this.field_width; l++) {
-	                		if (this.notPlayerStone((i - k) * this.field_width + l))
-	                			this.field[(i - k) * this.field_width + l] = this.field[((i - k) - 1) * this.field_width + l];
-	                	}
-	                }
-	            } else if (this.field[i * this.field_width + j] == 0) {
-	            	j = this.field_width;
+		var stop = false;
+		for (i = this.field_height-1; i >= 0 && !stop; i--) {
+			var empty = 0;
+			var full = 0;
+			for (j = this.field_width-1; j >= 0; j--) {
+	            // Delete full row and spawn new stone(s)
+				if (this.field[i * this.field_width + j] > 0) {
+	                full++;
+	                if (full >= this.field_width-1) {
+	                	this.score += this.field_width * this.multiplier;
+		                for (k = 0; k < i; k++) {
+		                	for (l = 0; l < this.field_width; l++) {
+		                		if (this.field[(i - k - 1) * this.field_width + l] === 0 || this.notPlayerStone((i - k - 1) * this.field_width + l))
+		                			this.field[(i - k) * this.field_width + l] = this.field[(i - k - 1) * this.field_width + l];
+		                	}
+		                }
+	            	}
+	            } else {
+	            	empty++;
+	            	if (full > 0)
+	            		j = -1;
+	            	else if (empty === this.field_width)
+	            		stop = true;
 	            }
 	        }
 	    }
 
-	    // Roll the dice which form the stone has
-	    this.stones[userid].kind = Math.floor((Math.random() * 10) + 1);  // Random zahl zwischen 1 & 10
+	    this.spawnStone(userid);
+	}
+
+	this.spawnStone = function(userid) {
+		// Roll the dice to decide which form the stone has (1-10)
+	    this.stones[userid].kind = 2; //Math.floor((Math.random() * 10) + 1);
 	    // No rotation
 	    this.stones[userid].rotation = 1;
 	    // Compute the starting position of the new stone
@@ -162,14 +154,19 @@ module.exports.room = function() {
 	}
 
 	this.notPlayerStone = function(index) {
-		var stoneid = this.field[index];
-		return stoneid !== this.stones[stoneid-1].pos[0] &&
-			   stoneid !== this.stones[stoneid-1].pos[1] &&
-			   stoneid !== this.stones[stoneid-1].pos[2] &&
-			   stoneid !== this.stones[stoneid-1].pos[3];
+		var user = this.field[index] - 1;
+
+		return index !== this.stones[user].pos[0] &&
+			   index !== this.stones[user].pos[1] &&
+			   index !== this.stones[user].pos[2] &&
+			   index !== this.stones[user].pos[3];
 	}
 
-	this.setStartPosition = function(userid) {
+	this.staticStoneAt = function(index) {
+		return this.field[index] > 0 && this.notPlayerStone(index);
+	}
+
+	this.setStartPosition = function(userid, sync) {
 		var at = this.stones[userid].start;
 		var limit = 4;
 
@@ -206,8 +203,9 @@ module.exports.room = function() {
 		    	break;
 		}
 
+		// Synchronize field and stone
 		for (i = 0; i < limit; i++) {
-		    this.field[this.stones[userid].pos[i]] = this.stones[userid].color;
+			this.field[this.stones[userid].pos[i]] = this.stones[userid].color;
 		}
 	}
 
@@ -551,7 +549,7 @@ module.exports.room = function() {
 			for (i = 0; i < 4 && this.stones[j].pos[i] !== -1; i++) {
 				// Check if the player's stone is in the last row or one before that and there
 				// is no free space under his stone
-				if ((this.stones[j].pos[i] < (this.field_height - 1) * this.field_width && this.field[this.stones[j].pos[i] + this.field_width] > 0 &&
+				if ((this.stones[j].pos[i] < (this.field_height - 1) * this.field_width && this.staticStoneAt(this.stones[j].pos[i] + this.field_width) &&
 					this.stones[j].pos[(i + 1) % 4] !== this.stones[j].pos[i] + this.field_width &&
 					this.stones[j].pos[(i + 2) % 4] !== this.stones[j].pos[i] + this.field_width &&
 					this.stones[j].pos[(i + 3) % 4] !== this.stones[j].pos[i] + this.field_width) || this.stones[j].pos[i] >= (this.field_height - 1) * this.field_width) {
