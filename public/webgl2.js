@@ -210,6 +210,7 @@ function start() {
         initParticleSystem();
 
         render();
+
         //setInterval(render, 15);
 
         // Initialize the shaders; this is where all the lighting for the
@@ -256,8 +257,7 @@ function initWebGL() {
 
         function resizeCanvas() {
             gl.canvas.width = window.innerWidth;
-            gl.canvas.height = window.innerHeight * 0.85;
-            //render();
+            gl.canvas.height = window.innerHeight - $('footer').height() - $('#nav-list').height();
         }
     }
     catch (e) {
@@ -873,7 +873,7 @@ function render() {
     ///////////////////////////////////////
     // Background
     ///////////////////////////////////////
-    gl.disable(gl.DEPTH_TEST);
+    /*gl.disable(gl.DEPTH_TEST);
 
     gl.activeTexture(gl.TEXTURE5);
     gl.bindTexture(gl.TEXTURE_2D, spaceBackground);
@@ -889,13 +889,13 @@ function render() {
 
     mvPopMatrix();
 
-    gl.enable(gl.DEPTH_TEST);
+    gl.enable(gl.DEPTH_TEST);*/
 
 
     ///////////////////////////////////////
     // ParticleSystem
     ///////////////////////////////////////
-    initParticleSystem2();
+    /*initParticleSystem2();
 
     // Rotate/Move triangles
     transform();
@@ -922,7 +922,7 @@ function render() {
 
     // DAS IST ALLES SO DUMM !!!
     gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 0, null);
-    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 1, null);
+    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 1, null);*/
 
 
     ///////////////////////////////////////
