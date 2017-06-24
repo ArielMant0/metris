@@ -124,6 +124,7 @@ function setEventListeners() {
 	$('#submit-login').on('click', function() {
 		if ($('#login-name').val()) {
 			setPlayerName($('#login-name').val());
+			$('#player-name').html($('#login-name').val());
 			$('#login-modal').css('display', 'none');
 			sendAjaxListeners('get', '/lobbies', '#content', initLobbyListeners);
 		}

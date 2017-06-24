@@ -114,7 +114,7 @@ function setEventHandlers() {
             if (roomlist.has(data.lobbyname) && !loops.has(data.lobbyname)) {//&& !roomlist.get(data.lobbyname).gameStarted) {
                 // Initializes the field and starts dropping stones
                 game = roomlist.get(data.lobbyname);
-                game.startGame(data.width, data.height);
+                game.startGame();
                 game.setGameOverCallback(endGame);
 
                 // Start game loops for this game
@@ -124,12 +124,6 @@ function setEventHandlers() {
                 io.sockets.in(game.name).emit('begin', { field: game.field, score: game.score });
             }
         });
-
-    	// Wenn ein Benutzer einen Text senden
-    	socket.on('chat', function (data) {
-    		// so wird dieser Text an alle anderen Benutzer gesendet
-    		io.sockets.emit('chat', { zeit: new Date(), name: data.name || 'Anonym', text: data.text });
-    	});
 
         // When the game tab needs current game information
         socket.on('udpdategame', function(data) {
@@ -151,9 +145,8 @@ function setEventHandlers() {
                 socket.join(data.lobbyname, function() {
                     roomlist.set(data.lobbyname, new lobby.room());
                     game = roomlist.get(data.lobbyname);
-                    game.createRoom(data.lobbyname, generateRoomID(), data.username);
-                    game.field_width = data.width;
-                    game.field_height = data.height;
+                    game.createRoom(data.lobbyname, generateRoomID(), data.username,
+                        data.width, data.height);
 
                     // Tell socket game info
                     socket.emit('setgameinfo', { lobbyname: game.name, id: game.getLastUser(),
@@ -169,9 +162,12 @@ function setEventHandlers() {
                     game = roomlist.get(data.lobbyname);
                     game.addUser(data.username);
 
-                    // Tell socket game info
+                    // Tell the player its game info
                     socket.emit('setgameinfo', { lobbyname: game.name, id: game.getLastUser(),
                         width: game.field_width, height: game.field_height, username: data.username });
+                    // If the game already started tell the player about it
+                    if (game.gameStarted)
+                        socket.emit('begin', { field: game.field, score: game.score });
                 });
             }
         });
@@ -186,7 +182,7 @@ function userNotPresent(lobby, name) {
 
 function endGame(lobby, score) {
     if (loops.has(lobby)) {
-        console.log("in end for " + lobby);
+        console.log("Gameover in lobby: " + lobby);
         clearInterval(loops.get(lobby).short);
         clearInterval(loops.get(lobby).long);
     }
@@ -217,9 +213,7 @@ function createDefaultGame() {
     // Just for Testing
     roomlist.set('default', new lobby.room());
     game = roomlist.get('default');
-    game.createRoom('default', generateRoomID(), 'Admin');
-    game.field_width = 30;
-    game.field_height = 16;
+    game.createRoom('default', generateRoomID(), 'Admin', 30, 16);
     game.removeUser(game.getLastUser());
 }
 

@@ -2,6 +2,7 @@ html, body {
     margin: 0;
     height: 100%;
     overflow: hidden;
+    font-family: sans-serif;
 }
 
 footer {
@@ -14,6 +15,16 @@ footer {
 
 footer p {
     color: white;
+}
+
+#player-name {
+    position: absolute;
+    top: 0;
+    right: 0;
+    margin-top: 10px;
+    padding-right: 10px;
+    color: white;
+    font-weight: bold;
 }
 
 .modal {
@@ -31,6 +42,10 @@ footer p {
 
 /* Modal Content/Box */
 .modal-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
     background-color: #FEFEFE;
     margin: 15% auto; /* 15% from the top and centered */
     padding: 20px;
@@ -40,12 +55,14 @@ footer p {
 
 /* The Close Button */
 .close {
+    align-self: flex-end;
     color: #aaa;
     float: right;
     font-size: 28px;
     font-weight: bold;
 }
 
+.active,
 .close:hover,
 .close:focus {
     color: black;
@@ -64,11 +81,14 @@ footer p {
     display: block;
 }
 
-#scorecanvas {
+#scoretext {
     position: absolute;
-    left: 0px;
-    top: 0px;
-    z-index: 10;
+    right: 0;
+    top: 0;
+    padding-right: 10px;
+    color: white;
+    font-weight: bold;
+    margin-bottom: 0;
 }
 
 .lobby-list, .score-list  {

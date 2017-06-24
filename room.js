@@ -32,11 +32,12 @@ module.exports.room = function() {
 	this.gameStarted = false;
 	this.callback;
 
-	this.createRoom = function(roomName, roomID, user) {
+	this.createRoom = function(roomName, roomID, user, width, height) {
 	    // Implement your game room (server side) logic here
 	    if (!this.gameStarted && !this.gameover) {
 	    	console.log("Created Lobby: \'" + roomName + "\'");
 	    	this.name = roomName;
+			this.initField(width, height);
 	    	this.addUser(user);
 	    }
 	};
@@ -73,10 +74,6 @@ module.exports.room = function() {
 	this.startGame = function(width, height) {
 		this.gameover = false;
 		this.gameStarted = true;
-		this.initField(width, height);
-		for(var i = 0; i < this.stones.length; i++) {
-			this.stonefinished(i);
-		}
 	}
 
 	this.initField = function(width, height) {
@@ -92,18 +89,24 @@ module.exports.room = function() {
 			this.players.push(new this.player(this.players.length, user));
 			this.stones.push(new this.stone(this.players.length));
 			this.getNewStartPosition(this.stones.length-1);
+			this.stonefinished(this.stones.length-1);
 		}
 	}
 
 	this.getNewStartPosition = function(userid) {
-		if ((userid + 1) % 2 === 0)
-			this.stones[userid].start = (this.stones.length / 2) * -PLAYER_OFFSET;
-		else
-			this.stones[userid].start = (this.stones.length / 2) * PLAYER_OFFSET;
+		if (userid !== 0) {
+			if ((userid + 1) % 2 === 0)
+				this.stones[userid].start = -PLAYER_OFFSET * Math.floor((userid + 1) / 2);
+			else
+				this.stones[userid].start = PLAYER_OFFSET * Math.floor((userid + 1) / 2);
+		}
 	}
 
 	this.removeUser = function(userid) {
 		if (userid >= 0 && userid < this.players.length) {
+			for (i = 0; i < 4 && this.stones[userid].pos[i] !== -1; i++) {
+				this.field[this.stones[userid].pos[i]] = 0;
+			}
 			console.log("Player \'" + this.players[userid].name + "\' left the game \'" + this.name + "\'");
 			if (userid === this.players.length - 1) {
 				this.players.pop();
@@ -159,62 +162,47 @@ module.exports.room = function() {
 
 	this.setStartPosition = function(userid) {
 		var at = this.stones[userid].start;
+		var limit = 4;
 
 		switch (this.stones[userid].kind) {
 	    	case 1:
 	    		this.stones[userid].pos = [(this.field_width / 2) - 1 + at, (this.field_width / 2) + at, -1, -1];
-		    	for (i = 0; i < 2; i++) {
-		    		this.field[this.stones[userid].pos[i]] = this.stones[userid].color;
-		    	} break;
+		    	limit = 2; break;
 	    	case 2:
 		    	this.stones[userid].pos = [this.field_width / 2 - 1 + at, this.field_width / 2 + at, this.field_width / 2 + 1 + at, -1]
-		    	for (i = 0; i < 3; i++) {
-		    		this.field[this.stones[userid].pos[i]] = this.stones[userid].color;
-		    	} break;
+		    	limit = 3; break;
 	    	case 3:
 		    	this.stones[userid].pos = [this.field_width / 2 - 1 + at, this.field_width / 2 + at, this.field_width / 2 + 1 + at, this.field_width / 2 + 2 + at]
-		    	for (i = 0; i < 4; i++) {
-		    		this.field[this.stones[userid].pos[i]] = this.stones[userid].color;
-		    	} break;
+		    	break;
 	    	case 4:
 		    	this.stones[userid].pos = [this.field_width / 2 - 1 + at, this.field_width / 2 + at, this.field_width / 2 + 1 + at, this.field_width / 2 + this.field_width + at]
-		    	for (i = 0; i < 4; i++) {
-		    		this.field[this.stones[userid].pos[i]] = this.stones[userid].color;
-		    	} break;
+		    	break;
 	    	case 5:
 		    	this.stones[userid].pos = [this.field_width / 2 - 1 + at, this.field_width / 2 + at, this.field_width / 2 - 1 + this.field_width + at, this.field_width / 2 + this.field_width + at]
-		    	for (i = 0; i < 4; i++) {
-		    		this.field[this.stones[userid].pos[i]] = this.stones[userid].color;
-		    	} break;
+		    	break;
 	    	case 6:
 		    	this.stones[userid].pos = [this.field_width / 2 - 1 + at, this.field_width / 2 - 1 + this.field_width + at, this.field_width / 2 + this.field_width + at, this.field_width / 2 + 1 + this.field_width + at]
-		    	for (i = 0; i < 4; i++) {
-		    		this.field[this.stones[userid].pos[i]] = this.stones[userid].color;
-		    	} break;
+		    	break;
 	    	case 7:
 		    	this.stones[userid].pos = [this.field_width / 2 - 1 + at, this.field_width / 2 + at, this.field_width / 2 + 1 + at, this.field_width / 2 - 1 + this.field_width + at]
-		    	for (i = 0; i < 4; i++) {
-		    		this.field[this.stones[userid].pos[i]] = this.stones[userid].color;
-		    	} break;
+		    	break;
 	    	case 8:
 		    	this.stones[userid].pos = [this.field_width / 2 - 1 + at, this.field_width / 2 + at, this.field_width / 2 - 1 + this.field_width + at, -1]
-		    	for (i = 0; i < 3; i++) {
-		    		this.field[this.stones[userid].pos[i]] = this.stones[userid].color;
-		    	} break;
+		    	limit = 3; break;
 	    	case 9:
 		    	this.stones[userid].pos = [this.field_width / 2 + at, this.field_width / 2 + 1 + at, this.field_width / 2 - 1 + this.field_width + at, this.field_width / 2 + this.field_width + at]
-		    	for (i = 0; i < 4; i++) {
-		    		this.field[this.stones[userid].pos[i]] = this.stones[userid].color;
-		    	} break;
+		    	break;
 	    	case 10:
 		    	this.stones[userid].pos = [this.field_width / 2 - 1 + at, this.field_width / 2 + at, this.field_width / 2 + this.field_width + at, this.field_width / 2 + 1 + this.field_width + at]
-		    	for (i = 0; i < 4; i++) {
-		    		this.field[this.stones[userid].pos[i]] = this.stones[userid].color;
-		    	} break;
+		    	break;
+		}
+
+		for (i = 0; i < limit; i++) {
+		    this.field[this.stones[userid].pos[i]] = this.stones[userid].color;
 		}
 	}
 
-	this.movestone = function(key, userid=0) {
+	this.movestone = function(key, userid) {
 	    // Turn left
 	    if (key === 81) {
 	    	switch (this.stones[userid].kind) {
@@ -538,7 +526,7 @@ module.exports.room = function() {
 	}
 
 	this.gamelogic = function() {
-		// Check if stones are so high the game is over
+		/* Check if stones are so high the game is over
 		for (j = 0; j < this.stones.length; j++) {
 			for (i = 0; i < this.field_width; i++) {
 				if (this.field[i] !== 0 && i !== this.stones[j].pos[0] && i !== this.stones[j].pos[1] && i !== this.stones[j].pos[2] && i !== this.stones[j].pos[3]) {
@@ -547,7 +535,7 @@ module.exports.room = function() {
 					this.callGameOverCallback();
 				}
 			}
-		}
+		}*/
 
 		// Check if the player's stones reached the bottom
 		for (j = 0; j < this.stones.length; j++) {
@@ -589,8 +577,6 @@ module.exports.room = function() {
 					}
 				}
 			}
-		} else {
-			// Do sth when the game is over (return to menu/lobby screen)
 		}
 	}
 };

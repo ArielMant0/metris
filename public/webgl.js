@@ -1,6 +1,5 @@
 var canvas;
 var gl;
-//var scoreContext;
 
 var cubeVerticesBuffer;
 var cubeVerticesTextureCoordBuffer;
@@ -38,6 +37,8 @@ var gameInfo = {
 
 var audio;
 var socket;
+
+var level = 1;
 var gameRunning = false;
 
 $(document).ready(function () {
@@ -60,12 +61,14 @@ $(document).ready(function () {
     socket.on('move', function (data) {
         gameInfo.field = data.field;
         gameInfo.score = data.score;
+        updateScore();
     });
 
     socket.on('begin', function (data) {
         gameInfo.field = data.field;
         gameInfo.score = 0;
         gameRunning = true;
+        updateScore();
     });
 
     socket.on('setgameinfo', function(data) {
@@ -86,10 +89,27 @@ $(document).ready(function () {
 
     $(document).keydown(function (e) {
         // A, E, Q, D, S
-        if (gameRunning && (e.which == 65 || e.which == 69 || e.which == 81 || e.which == 68 || e.which == 83))
+        if (gameRunning && (e.which == 65 || e.which == 69 || e.which == 81 || e.which == 68 || e.which == 83)) {
             submitmove(e.which);
+        } else if (e.which == 49) {
+            level = 1;
+            resetBuffer();
+        } else if (e.which == 50) {
+            level = 2;
+            resetBuffer();
+        } else if (e.which == 51) {
+            level = 3;
+            resetBuffer();
+        } else if (e.which == 52) {
+            level = 4;
+            resetBuffer();
+        }
     });
 });
+
+function updateScore() {
+    $('#scoretext').html('Score: ' + gameInfo.score);
+}
 
 function createLobby(lobby, fwidth, fheight) {
     if (gameInfo.username)
@@ -169,11 +189,9 @@ function start() {
 function initWebGL() {
 
     gl = null;
-    //scoreContext = null;
 
     try {
         gl = document.getElementById('glcanvas').getContext("webgl2");
-        //scoreContext = document.getElementById('scorecanvas').getContext("2d");
 
         window.addEventListener('resize', resizeCanvas, false);
 
@@ -420,10 +438,6 @@ function drawScene() {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-
-    // Clear the score canvas
-    //scoreContext.clearRect(0, 0, scoreContext.canvas.width, scoreContext.canvas.height);
-    //scoreContext.fillText(gameInfo.score, 10, 10);
 
     // Establish the perspective with which we want to view the
     // scene. Our gameInfo.field of view is 45 degrees, with a width/height
