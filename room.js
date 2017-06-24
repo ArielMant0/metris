@@ -3,10 +3,12 @@ var PLAYER_OFFSET = 4;
 
 module.exports.room = function() {
 
+	// Field data
 	this.field_height = 0;
 	this.field_width = 0;
 	this.field;
 
+	// Stone constructor
 	this.stone = function(userid) {
 		// 1: OX  2: XOX 4: XOX  5: XX  6: X    7: OXX  8: OX  9:  OX  10: XX   O = rotation center
 		// 3: XOXX           X      OX     OXX     X       X      XX        OX
@@ -17,11 +19,14 @@ module.exports.room = function() {
 		this.start = 0;
 	};
 
+	// Player constructor
 	this.player = function(userid, player) {
 		this.id = userid;
 		this.name = player;
 	};
 
+	// Metadata
+	this.speed = 1000;
 	this.score = 0;
 	this.multiplier = 1;
 	this.id = 0;
@@ -73,20 +78,21 @@ module.exports.room = function() {
 	}
 
 	this.setStartPosition = function(userid) {
-		if (userid !== 0) {
-			if ((userid + 1) % 2 === 0)
-				this.stones[userid].start = -PLAYER_OFFSET * Math.floor((userid + 1) / 2);
-			else
-				this.stones[userid].start = PLAYER_OFFSET * Math.floor((userid + 1) / 2);
-		}
+		if ((userid + 1) % 2 === 0)
+			this.stones[userid].start = -PLAYER_OFFSET * Math.floor((userid + 1) / 2);
+		else
+			this.stones[userid].start = PLAYER_OFFSET * Math.floor((userid + 1) / 2);
 	}
 
 	this.removeUser = function(userid) {
 		if (userid >= 0 && userid < this.players.length) {
+			// Reset field at player's stone
 			for (i = 0; i < 4 && this.stones[userid].pos[i] !== -1; i++) {
 				this.field[this.stones[userid].pos[i]] = 0;
 			}
+			// Log user leaving game
 			console.log("Player \'" + this.players[userid].name + "\' left the game \'" + this.name + "\'");
+			// Reomve player and player's stone from game
 			if (userid === this.players.length - 1) {
 				this.players.pop();
 				this.stones.pop();
@@ -97,6 +103,7 @@ module.exports.room = function() {
 				this.players = this.players.filter(function(item) { return item.id !== userid; });
 				this.stones = this.stones.filter(function(item) { return item.color !== userid; });
 			}
+
 		}
 	}
 
@@ -146,7 +153,7 @@ module.exports.room = function() {
 
 	this.spawnStone = function(userid) {
 		// Roll the dice to decide which form the stone has (1-10)
-	    this.stones[userid].kind = 2; //Math.floor((Math.random() * 10) + 1);
+	    this.stones[userid].kind = Math.floor((Math.random() * 10) + 1);
 	    // No rotation
 	    this.stones[userid].rotation = 1;
 	    // Compute the starting position of the new stone
@@ -166,7 +173,7 @@ module.exports.room = function() {
 		return this.field[index] > 0 && this.notPlayerStone(index);
 	}
 
-	this.setStartPosition = function(userid, sync) {
+	this.setStartPosition = function(userid) {
 		var at = this.stones[userid].start;
 		var limit = 4;
 

@@ -1,7 +1,7 @@
 var express = require('express')
 ,   app = express()
 ,   server = require('http').createServer(app)
-,   io = require('socket.io')(server) //, {'transports': ['websocket']})
+,   io = require('socket.io')(server, { 'transports': ['websocket', 'polling'] })
 ,   conf = require('./config.json')
 ,   lobby = require('./room.js')
 ,   authentication = require('express-authentication');
