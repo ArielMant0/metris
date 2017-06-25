@@ -225,7 +225,7 @@ function createDefaultGame() {
     // Just for Testing
     roomlist.set('default', new lobby.room());
     game = roomlist.get('default');
-    game.createRoom('default', generateRoomID(), 'Admin', 30, 16);
+    game.createRoom('default', generateRoomID(), 'Admin', 5, 5);
     game.setSpeed(500);
     game.removeUser(game.getLastUser());
 }

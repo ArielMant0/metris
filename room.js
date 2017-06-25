@@ -157,7 +157,7 @@ module.exports.room = function() {
 
 	this.spawnStone = function(userid) {
 		// Roll the dice to decide which form the stone has (1-10)
-	    this.stones[userid].kind = Math.floor((Math.random() * 10) + 1);
+	    this.stones[userid].kind = 1;Math.floor((Math.random() * 10) + 1);
 	    // No rotation
 	    this.stones[userid].rotation = 1;
 	    // Compute the starting position of the new stone
