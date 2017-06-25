@@ -111,7 +111,7 @@ function setEventHandlers() {
 
         // Start the game
         socket.on('startgame', function (data) {
-            if (roomlist.has(data.lobbyname) && !loops.has(data.lobbyname)) {//&& !roomlist.get(data.lobbyname).gameStarted) {
+            if (roomlist.has(data.lobbyname)) {//&& !roomlist.get(data.lobbyname).gameStarted) {
                 // Initializes the field and starts dropping stones
                 game = roomlist.get(data.lobbyname);
                 game.startGame();
@@ -121,7 +121,7 @@ function setEventHandlers() {
                 setLoops(game);
 
                 // Tell all sockets in the game what the field looks like
-                io.sockets.in(game.name).emit('begin', { field: game.field, score: game.score });
+                io.sockets.in(game.name).emit('begin', sendBinaryField(game.field));
             }
         });
 
@@ -129,7 +129,8 @@ function setEventHandlers() {
         socket.on('udpdategame', function(data) {
             if (roomlist.has(data.lobbyname)) {
                 game = roomlist.get(data.lobbyname);
-                socket.emit('move', { field: game.field, score: game.score });
+                socket.emit('moveField', sendBinaryField(game.field));
+                socket.emit('moveScore', sendBinaryScore(game.score));
             }
         });
 
@@ -139,7 +140,8 @@ function setEventHandlers() {
                 game = roomlist.get(data.lobbyname);
                 game.movestone(data.key, data.userid);
 
-                io.sockets.in(game.name).emit('move', { field: game.field, score: game.score });
+                io.sockets.in(game.name).emit('moveField', sendBinaryField(game.field));
+                io.sockets.in(game.name).emit('moveScore', sendBinaryScore(game.score));
             }
     	});
 
@@ -170,7 +172,7 @@ function setEventHandlers() {
                         width: game.field_width, height: game.field_height, username: data.username });
                     // If the game already started tell the player about it
                     if (game.gameStarted && !game.gameover)
-                        socket.emit('begin', { field: game.field, score: game.score });
+                        socket.emit('begin', sendBinaryField(game.field));
                 });
             }
         });
@@ -188,7 +190,7 @@ function endGame(lobby, score) {
         console.log("Gameover in lobby: " + lobby);
         clearInterval(loops.get(lobby).short);
         clearInterval(loops.get(lobby).long);
-        clearInterval(loops.get(lobby).other);
+        //clearInterval(loops.get(lobby).other);
         io.socket.in(lobby).emit('gameover');
     }
 }
@@ -200,32 +202,52 @@ function setLoops(game) {
         var l = setInterval(function() {
             if (!game.gameover && game.gameStarted) {
                 game.dropStones();
-                io.sockets.in(game.name).emit('move', { field: game.field, score: game.score });
+                io.sockets.in(game.name).emit('moveField', sendBinaryField(game.field));
+                io.sockets.in(game.name).emit('moveScore', sendBinaryScore(game.score));
             }
         }, game.speed);
 
         var s = setInterval(function () {
             if (!game.gameover && game.gameStarted) {
                 game.gamelogic();
-                io.sockets.in(game.name).emit('move', { field: game.field, score: game.score });
+                io.sockets.in(game.name).emit('moveField', sendBinaryField(game.field));
+                io.sockets.in(game.name).emit('moveScore', sendBinaryScore(game.score));
             }
         }, 100);
 
-        var o = setInterval(function () {
-            if (!game.gameover && game.gameStarted)
-                io.sockets.in(game.name).emit('move', { field: game.field, score: game.score });
-        }, 10);
+        // var o = setInterval(function () {
+        //     if (!game.gameover && game.gameStarted)
+        //         io.sockets.in(game.name).emit('move', { field: fieldAsBinary(game.field),
+        //             score: scoreAsBinary(game.score) });
+        // }, 10);
 
         // Store IDs so we can stop intervals once the game is over
-        loops.set(game.name, { long: l, short: s, other: o });
+        loops.set(game.name, { long: l, short: s }); // other: o
     }
+}
+
+function sendBinaryField(field) {
+    // Create Array Buffer
+    var bufArr = new ArrayBuffer(field.length);
+    var bufView = new Uint8Array(bufArr);
+    for(i = 0; i < field.length; i++) {
+        bufView[i] = field[i];
+    }
+    return bufArr;
+}
+
+function sendBinaryScore(score) {
+    var bufArr = new ArrayBuffer(2);
+    var bufView = new Uint16Array(bufArr);
+    bufView[0] = score;
+    return bufArr;
 }
 
 function createDefaultGame() {
     // Just for Testing
     roomlist.set('default', new lobby.room());
     game = roomlist.get('default');
-    game.createRoom('default', generateRoomID(), 'Admin', 60, 60);
+    game.createRoom('default', generateRoomID(), 'Admin', 60, 30);
     game.setSpeed(500);
     game.removeUser(game.getLastUser());
 }
