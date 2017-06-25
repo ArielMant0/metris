@@ -81,12 +81,14 @@ function loadGame(event) {
 
 function createLobbyForm(event) {
 	$('#create-modal').css('display', 'block');
+	$('#lobby-name').focus();
 }
 
 // To be called when a lobby wants to be joined by a non-identified user
 function joinForm(event) {
 	// Display login dialog
 	$('#login-modal').css('display', 'block');
+	$('#login-name').focus();
 }
 
 function setEventListeners() {

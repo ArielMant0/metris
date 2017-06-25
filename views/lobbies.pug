@@ -4,14 +4,16 @@ div(class='modal', id='create-modal')
     div(class='modal-content')
         span(class='close' id='close-create-modal') &times;
         input(type='text', id='lobby-name', placeholder='Lobby Name')
-        br
         select(id='field-width')
             option 30
             option 40
         select(id='field-height')
             option 16
             option 20
-        br
+        select(id='game-speed')
+            option 1000
+            option 750
+            option 500
         button(type='submit', id='submit-lobby') Create
 
 ul(class='lobby-list')

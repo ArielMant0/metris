@@ -188,6 +188,7 @@ function endGame(lobby, score) {
         console.log("Gameover in lobby: " + lobby);
         clearInterval(loops.get(lobby).short);
         clearInterval(loops.get(lobby).long);
+        clearInterval(loops.get(lobby).other);
         io.socket.in(lobby).emit('gameover');
     }
 }
@@ -197,19 +198,26 @@ function setLoops(game) {
 
     if (!loops.has(game.name)) {
         var l = setInterval(function() {
-            if (!game.gameover && game.gameStarted)
+            if (!game.gameover && game.gameStarted) {
                 game.dropStones();
                 io.sockets.in(game.name).emit('move', { field: game.field, score: game.score });
-        }, 1000);
+            }
+        }, game.speed);
 
         var s = setInterval(function () {
-            if (!game.gameover && game.gameStarted)
+            if (!game.gameover && game.gameStarted) {
                 game.gamelogic();
                 io.sockets.in(game.name).emit('move', { field: game.field, score: game.score });
+            }
         }, 100);
 
+        var o = setInterval(function () {
+            if (!game.gameover && game.gameStarted)
+                io.sockets.in(game.name).emit('move', { field: game.field, score: game.score });
+        }, 10);
+
         // Store IDs so we can stop intervals once the game is over
-        loops.set(game.name, { long: l, short: s });
+        loops.set(game.name, { long: l, short: s, other: o });
     }
 }
 
@@ -218,6 +226,7 @@ function createDefaultGame() {
     roomlist.set('default', new lobby.room());
     game = roomlist.get('default');
     game.createRoom('default', generateRoomID(), 'Admin', 30, 16);
+    game.setSpeed(500);
     game.removeUser(game.getLastUser());
 }
 

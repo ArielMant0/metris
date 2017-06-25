@@ -26,7 +26,7 @@ module.exports.room = function() {
 	};
 
 	// Metadata
-	this.speed = 1000;
+	this.speed = 100;
 	this.score = 0;
 	this.multiplier = 1;
 	this.id = 0;
@@ -48,6 +48,10 @@ module.exports.room = function() {
 	    	this.addUser(user);
 	    }
 	};
+
+	this.setSpeed = function(speed) {
+		this.speed = speed;
+	}
 
 	this.setGameOverCallback = function(func) {
 		this.callback = func;
@@ -129,7 +133,7 @@ module.exports.room = function() {
 	            // Delete full row and spawn new stone(s)
 				if (this.field[i * this.field_width + j] > 0) {
 	                full++;
-	                if (full >= this.field_width-1) {
+	                if (full == this.field_width) {
 	                	this.score += this.field_width * this.multiplier;
 		                for (k = 0; k < i; k++) {
 		                	for (l = 0; l < this.field_width; l++) {
