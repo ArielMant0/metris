@@ -191,7 +191,7 @@ function endGame(lobby, score) {
         clearInterval(loops.get(lobby).short);
         clearInterval(loops.get(lobby).long);
         //clearInterval(loops.get(lobby).other);
-        io.socket.in(lobby).emit('gameover');
+        io.sockets.in(lobby).emit('gameover');
     }
 }
 
@@ -287,7 +287,7 @@ function createDefaultGame() {
     // Just for Testing
     roomlist.set('default', new lobby.room());
     game = roomlist.get('default');
-    game.createRoom('default', generateRoomID(), 'Admin', 60, 30);
+    game.createRoom('default', generateRoomID(), 'Admin', 100, 60);
     game.setSpeed(500);
     game.removeUser(game.getLastUser());
 }

@@ -56,7 +56,7 @@ function initLobbyListeners() {
 
 	$('#submit-lobby').on('click', function() {
 		createLobby($('#lobby-name').val(), $('#field-width').val(), $('#field-height').val());
-		sendAjaxListeners('get', '/lobbies', '#content', initLobbyListeners);
+		loadGame({ data: { gameID: $('#lobby-name').val() }});
 	});
 }
 

@@ -71,7 +71,6 @@ module.exports.room = function() {
     this.initField = function() {
         this.field = new Array(this.field_height * this.field_width);
         this.field.fill(0);
-        this.field[this.field.length - 1] = 3;
     }
 
     this.addUser = function(user) {
@@ -203,7 +202,6 @@ module.exports.room = function() {
 
     this.setStartPosition = function(userid) {
         var at = this.stones[userid].start;
-        var limit = 4;
 
         switch (this.stones[userid].kind) {
             case 1:
@@ -568,7 +566,7 @@ module.exports.room = function() {
     }
 
     this.gamelogic = function() {
-        /* Check if stones are so high the game is over
+        // Check if stones are so high the game is over
         for (j = 0; j < this.stones.length; j++) {
             for (i = 0; i < this.field_width; i++) {
                 if (this.field[i] !== 0 && i !== this.stones[j].pos[0] && i !== this.stones[j].pos[1] && i !== this.stones[j].pos[2] && i !== this.stones[j].pos[3]) {
@@ -577,7 +575,7 @@ module.exports.room = function() {
                     this.callGameOverCallback();
                 }
             }
-        }*/
+        }
 
         // Check if the player's stones reached the bottom
         var changed = false;
