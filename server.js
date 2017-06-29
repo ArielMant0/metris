@@ -9,6 +9,8 @@ var express = require('express')
 var once = true;
 var last = 0;
 
+var useBinary = conf.binary;
+
 // Webserver
 // Use Port X
 var port = process.env.PORT || conf.port;
@@ -22,20 +24,20 @@ app.set('view engine', 'pug');
 // Deliver static files
 app.use(express.static(__dirname + '/public'));
 
-app.use(function myauth(req, res, next) {
-    req.challenge = req.get('Authorization');
-    req.authenticated = req.authentication === 'secret';
+// app.use(function myauth(req, res, next) {
+//     req.challenge = req.get('Authorization');
+//     req.authenticated = req.authentication === 'secret';
 
-    // provide the result of the authentication; generally some kind of user
-    // object on success and some kind of error as to why authentication failed
-    // otherwise.
-    if (req.authenticated) {
-        req.authentication = { username: getUserName() };
-    } else {
-        req.authentication = { error: 'INVALID_API_KEY' };
-    }
-    next();
-});
+//     // provide the result of the authentication; generally some kind of user
+//     // object on success and some kind of error as to why authentication failed
+//     // otherwise.
+//     if (req.authenticated) {
+//         req.authentication = { username: getUserName() };
+//     } else {
+//         req.authentication = { error: 'INVALID_API_KEY' };
+//     }
+//     next();
+// });
 
 // Main Site
 app.get('/', function (req, res) {
@@ -105,13 +107,12 @@ function setEventHandlers() {
 
     io.sockets.on('connection', function (socket) {
 
-    	// DEBUG
-        // if (once && false)
-        //     joinDefaultGame(socket);
+        if (once && conf.debug)
+            joinDefaultGame(socket);
 
         // Start the game
         socket.on('startgame', function (data) {
-            if (roomlist.has(data.lobbyname)) {//&& !roomlist.get(data.lobbyname).gameStarted) {
+            if (roomlist.has(data.lobbyname)) {
                 // Initializes the field and starts dropping stones
                 game = roomlist.get(data.lobbyname);
                 game.startGame();
@@ -121,7 +122,7 @@ function setEventHandlers() {
                 setLoops(game);
 
                 // Tell all sockets in the game what the field looks like
-                io.sockets.in(game.name).emit('begin', sendBinaryField(game.field));
+                io.sockets.in(game.name).emit('begin', sendFieldData(game.field));
             }
         });
 
@@ -129,8 +130,8 @@ function setEventHandlers() {
         socket.on('udpdategame', function(data) {
             if (roomlist.has(data.lobbyname)) {
                 game = roomlist.get(data.lobbyname);
-                socket.emit('moveField', sendBinaryField(game.field));
-                socket.emit('moveScore', sendBinaryScore(game.score));
+                socket.emit('moveField', sendFieldData(game.field));
+                socket.emit('moveScore', sendScoreData(game.score));
             }
         });
 
@@ -140,8 +141,7 @@ function setEventHandlers() {
                 game = roomlist.get(data.lobbyname);
                 game.movestone(data.key, data.userid);
 
-                io.sockets.in(game.name).emit('moveField', sendBinaryField(game.field));
-                io.sockets.in(game.name).emit('moveScore', sendBinaryScore(game.score));
+                io.sockets.in(game.name).emit('movePlayers', sendPlayerData(game.stones));
             }
     	});
 
@@ -172,7 +172,7 @@ function setEventHandlers() {
                         width: game.field_width, height: game.field_height, username: data.username });
                     // If the game already started tell the player about it
                     if (game.gameStarted && !game.gameover)
-                        socket.emit('begin', sendBinaryField(game.field));
+                        socket.emit('begin', sendFieldData(game.field));
                 });
             }
         });
@@ -202,16 +202,18 @@ function setLoops(game) {
         var l = setInterval(function() {
             if (!game.gameover && game.gameStarted) {
                 game.dropStones();
-                io.sockets.in(game.name).emit('moveField', sendBinaryField(game.field));
-                io.sockets.in(game.name).emit('moveScore', sendBinaryScore(game.score));
+                io.sockets.in(game.name).emit('movePlayers', sendPlayerData(game.stones));
             }
         }, game.speed);
 
         var s = setInterval(function () {
             if (!game.gameover && game.gameStarted) {
+                game.stateChanged = false;
                 game.gamelogic();
-                io.sockets.in(game.name).emit('moveField', sendBinaryField(game.field));
-                io.sockets.in(game.name).emit('moveScore', sendBinaryScore(game.score));
+                if (game.stateChanged) {
+                    io.sockets.in(game.name).emit('moveField', sendFieldData(game.field));
+                    io.sockets.in(game.name).emit('moveScore', sendScoreData(game.score));
+                }
             }
         }, 100);
 
@@ -226,8 +228,34 @@ function setLoops(game) {
     }
 }
 
+function sendFieldData(field) {
+    var data = OptimizeField(field);
+    if (useBinary)
+        return sendBinaryField(data);
+    else
+        return { field: data };
+}
+
+function sendPlayerData(stones) {
+    if (useBinary) {
+        return sendBinaryPlayers(stones);
+    } else {
+        var json = {};
+        stones.forEach(function(item, index, array) {
+            json[(index+1).toString()] = item.pos;
+        });
+        return json;
+    }
+}
+
+function sendScoreData(points) {
+    if (useBinary)
+        return sendBinaryScore(points);
+    else
+        return { score: points };
+}
+
 function sendBinaryField(field) {
-    // Create Array Buffer
     var bufArr = new ArrayBuffer(field.length);
     var bufView = new Uint8Array(bufArr);
     for(i = 0; i < field.length; i++) {
@@ -236,11 +264,23 @@ function sendBinaryField(field) {
     return bufArr;
 }
 
+function sendBinaryPlayers(players) {
+    var bufArr = new ArrayBuffer(2);
+    var bufView = new Uint16Array(bufArr);
+    bufView[0] = score;
+    return bufArr;
+}
+
 function sendBinaryScore(score) {
     var bufArr = new ArrayBuffer(2);
     var bufView = new Uint16Array(bufArr);
     bufView[0] = score;
     return bufArr;
+}
+
+function OptimizeField(field) {
+    // TODO implement
+    return field;
 }
 
 function createDefaultGame() {

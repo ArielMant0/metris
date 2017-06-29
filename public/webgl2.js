@@ -59,20 +59,22 @@ var instanceOffsets;
 var instanceRotations;
 var instanceColors;
 
+var players = {};
 var gameInfo = {
-  userid: 0,
-  lobby: '',
-  field_height: 16,
-  field_width: 30,
-  field: [],
-  username: '',
-  score: 0
+    userid: 0,
+    lobby: '',
+    field_height: 16,
+    field_width: 30,
+    field: [],
+    username: '',
+    score: 0
 };
 
 var audio;
 var socket;
 
 var level = 1;
+var readBinary = false;
 var gameRunning = false;
 
 $(document).ready(function () {
@@ -92,18 +94,50 @@ $(document).ready(function () {
         audio2.play();
     });
 
-    socket.on('move', function (data) {
-        gameInfo.field = data.field;
-        if (data.score != gameInfo.score)
-          updateScore(data.score);
+    socket.on('moveField', function (data) {
+        if (readBinary) {
+            var bufView = new Uint8Array(data);
+            gameInfo.field = Array.prototype.slice.call(bufView);
+        } else {
+            gameInfo.field = data.field;
+        }
+    });
+
+    socket.on('movePlayers', function (data) {
+        if (readBinary) {
+            // var bufView = new Uint16Array(data);
+            // if (bufView[0] != gameInfo.score)
+            //     updateScore(bufView[0]);
+        } else {
+            for (var key in data) {
+                players[key] = data[key];
+            }
+        }
+    });
+
+    socket.on('moveScore', function (data) {
+        if (readBinary) {
+            var bufView = new Uint16Array(data);
+            if (bufView[0] != gameInfo.score)
+                updateScore(bufView[0]);
+        } else {
+            gameInfo.score = data.score;
+        }
     });
 
     socket.on('begin', function (data) {
-        gameInfo.field = data.field;
+        if (readBinary) {
+            var bufView = new Uint8Array(data);
+            gameInfo.field = Array.prototype.slice.call(bufView);
+            for (i = 0; i < bufView.length; i++) {
+                console.log('[' + i + '] = ' + bufView[i]);
+            }
+        } else {
+            gameInfo.field = data.field;
+        }
         gameInfo.score = 0;
         gameRunning = true;
-        if (data.score != gameInfo.score)
-          updateScore(data.score);
+        updateScore(gameInfo.score);
     });
 
     socket.on('gameover', function() {
@@ -372,40 +406,40 @@ function initBuffers() {
     var vertices = [
       // Front face
       -1.0, -1.0, 1.0,
-       1.0, -1.0, 1.0,
-       1.0, 1.0, 1.0,
+      1.0, -1.0, 1.0,
+      1.0, 1.0, 1.0,
       -1.0, 1.0, 1.0,
 
       // Back face
       -1.0, -1.0, -1.0,
       -1.0, 1.0, -1.0,
-       1.0, 1.0, -1.0,
-       1.0, -1.0, -1.0,
+      1.0, 1.0, -1.0,
+      1.0, -1.0, -1.0,
 
       // Top face
       -1.0, 1.0, -1.0,
       -1.0, 1.0, 1.0,
-       1.0, 1.0, 1.0,
-       1.0, 1.0, -1.0,
+      1.0, 1.0, 1.0,
+      1.0, 1.0, -1.0,
 
       // Bottom face
       -1.0, -1.0, -1.0,
-       1.0, -1.0, -1.0,
-       1.0, -1.0, 1.0,
+      1.0, -1.0, -1.0,
+      1.0, -1.0, 1.0,
       -1.0, -1.0, 1.0,
 
       // Right face
-       1.0, -1.0, -1.0,
-       1.0, 1.0, -1.0,
-       1.0, 1.0, 1.0,
-       1.0, -1.0, 1.0,
+      1.0, -1.0, -1.0,
+      1.0, 1.0, -1.0,
+      1.0, 1.0, 1.0,
+      1.0, -1.0, 1.0,
 
       // Left face
       -1.0, -1.0, -1.0,
       -1.0, -1.0, 1.0,
       -1.0, 1.0, 1.0,
       -1.0, 1.0, -1.0
-    ];
+      ];
 
     // Now pass the list of vertices into WebGL to build the shape. We
     // do this by creating a Float32Array from the JavaScript array,
@@ -420,44 +454,44 @@ function initBuffers() {
 
     var vertexNormals = [
       // Front
-       0.0, 0.0, 1.0,
-       0.0, 0.0, 1.0,
-       0.0, 0.0, 1.0,
-       0.0, 0.0, 1.0,
+      0.0, 0.0, 1.0,
+      0.0, 0.0, 1.0,
+      0.0, 0.0, 1.0,
+      0.0, 0.0, 1.0,
 
       // Back
-       0.0, 0.0, -1.0,
-       0.0, 0.0, -1.0,
-       0.0, 0.0, -1.0,
-       0.0, 0.0, -1.0,
+      0.0, 0.0, -1.0,
+      0.0, 0.0, -1.0,
+      0.0, 0.0, -1.0,
+      0.0, 0.0, -1.0,
 
       // Top
-       0.0, 1.0, 0.0,
-       0.0, 1.0, 0.0,
-       0.0, 1.0, 0.0,
-       0.0, 1.0, 0.0,
+      0.0, 1.0, 0.0,
+      0.0, 1.0, 0.0,
+      0.0, 1.0, 0.0,
+      0.0, 1.0, 0.0,
 
       // Bottom
-       0.0, -1.0, 0.0,
-       0.0, -1.0, 0.0,
-       0.0, -1.0, 0.0,
-       0.0, -1.0, 0.0,
+      0.0, -1.0, 0.0,
+      0.0, -1.0, 0.0,
+      0.0, -1.0, 0.0,
+      0.0, -1.0, 0.0,
 
       // Right
-       1.0, 0.0, 0.0,
-       1.0, 0.0, 0.0,
-       1.0, 0.0, 0.0,
-       1.0, 0.0, 0.0,
+      1.0, 0.0, 0.0,
+      1.0, 0.0, 0.0,
+      1.0, 0.0, 0.0,
+      1.0, 0.0, 0.0,
 
       // Left
       -1.0, 0.0, 0.0,
       -1.0, 0.0, 0.0,
       -1.0, 0.0, 0.0,
       -1.0, 0.0, 0.0
-    ];
+      ];
 
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexNormals),
-                  gl.STATIC_DRAW);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexNormals),
+          gl.STATIC_DRAW);
 
     // Map the texture onto the cube's faces.
 
@@ -495,10 +529,10 @@ function initBuffers() {
       1.0, 0.0,
       1.0, 1.0,
       0.0, 1.0
-    ];
+      ];
 
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates),
-                  gl.STATIC_DRAW);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates),
+          gl.STATIC_DRAW);
 
     // Build the element array buffer; this specifies the indices
     // into the vertex array for each face's vertices.
@@ -517,7 +551,7 @@ function initBuffers() {
       12, 13, 14, 12, 14, 15,   // bottom
       16, 17, 18, 16, 18, 19,   // right
       20, 21, 22, 20, 22, 23    // left
-    ]
+      ]
 
     // Now send the element array to GL
 
@@ -534,9 +568,9 @@ function initBuffers() {
     // -- Init Buffers
     var vertices = new Float32Array([
         -0.3, -0.5,
-         0.3, -0.5,
-         0.0, 0.5
-    ]);
+        0.3, -0.5,
+        0.0, 0.5
+        ]);
     cubeVertexPosBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertexPosBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
@@ -547,7 +581,7 @@ function initBuffers() {
     var colors = new Float32Array([
         1.0, 0.5, 0.0,
         0.0, 0.5, 1.0
-    ]);
+        ]);
     cubeVertexColorBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertexColorBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, colors, gl.STATIC_DRAW);
@@ -603,10 +637,10 @@ function handleTextureLoaded(image, texture) {
 
 function initParticleSystem() {
     trianglePositions = new Float32Array([
-            0.015, 0.0,
-            -0.010, 0.010,
-            -0.010, -0.010,
-    ]);
+        0.015, 0.0,
+        -0.010, 0.010,
+        -0.010, -0.010,
+        ]);
 
     instanceOffsets = new Float32Array(NUM_INSTANCES * 2);
     instanceRotations = new Float32Array(NUM_INSTANCES * 1);
@@ -1010,6 +1044,40 @@ function render() {
 
                     // Restore the original matrix
 
+                    mvPopMatrix();
+                }
+            }
+        }
+    }
+
+    if (typeof players !== 'undefined') {
+        for (var key in players) {
+            for (d2 = 0; d2 < players[key].length; d2++) {
+                if (players[key][d2] >= 0) {
+                    // Save the current matrix, then rotate before we draw.
+                    mvPushMatrix();
+                    mvTranslate([Math.floor(players[key][d2] % gameInfo.field_width) * 2 - gameInfo.field_width + 1,
+                        gameInfo.field_height - Math.floor(players[key][d2] / gameInfo.field_width) * 2 - 1, 0]);
+                    //mvRotate(cubeRotation, [1, 0, 1]);
+
+                    // Specify the texture to map onto the faces.
+                    var id = parseInt(key);
+                    if (id === 1) {
+                        gl.uniform1i(gl.getUniformLocation(shaderProgram, "uSampler"), 1);
+                    } else if (id === 2) {
+                        gl.uniform1i(gl.getUniformLocation(shaderProgram, "uSampler"), 2);
+                    } else if (id === 3) {
+                        gl.uniform1i(gl.getUniformLocation(shaderProgram, "uSampler"), 3);
+                    } else if (id === 4) {
+                        gl.uniform1i(gl.getUniformLocation(shaderProgram, "uSampler"), 4);
+                    }
+
+                    // Draw the cube.
+                    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeVerticesIndexBuffer);
+                    setMatrixUniforms();
+                    gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
+
+                    // Restore the original matrix
                     mvPopMatrix();
                 }
             }
