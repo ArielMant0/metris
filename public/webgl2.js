@@ -1014,41 +1014,41 @@ function render() {
     gl.vertexAttribDivisor(vertexNormalAttribute, 0);
 
 
-    if (typeof gameInfo.field !== 'undefined') {
-        for (d1 = 0; d1 < gameInfo.field_height; d1++) {
-            for (d2 = 0; d2 < gameInfo.field_width; d2++) {
-                if (gameInfo.field[d1 * gameInfo.field_width + d2] > 0 && gameInfo.field[d1 * gameInfo.field_width + d2] < 5) {
+    // if (typeof gameInfo.field !== 'undefined') {
+    //     for (d1 = 0; d1 < gameInfo.field_height; d1++) {
+    //         for (d2 = 0; d2 < gameInfo.field_width; d2++) {
+    //             if (gameInfo.field[d1 * gameInfo.field_width + d2] > 0 && gameInfo.field[d1 * gameInfo.field_width + d2] < 5) {
 
-                    // Save the current matrix, then rotate before we draw.
-                    mvPushMatrix();
-                    mvTranslate([d2 * 2 - gameInfo.field_width + 1, gameInfo.field_height - d1 * 2 - 1, 0]);
-                    //mvRotate(cubeRotation, [1, 0, 1]);
+    //                 // Save the current matrix, then rotate before we draw.
+    //                 mvPushMatrix();
+    //                 mvTranslate([d2 * 2 - gameInfo.field_width + 1, gameInfo.field_height - d1 * 2 - 1, 0]);
+    //                 //mvRotate(cubeRotation, [1, 0, 1]);
 
-                    // Specify the texture to map onto the faces.
+    //                 // Specify the texture to map onto the faces.
 
-                    if (gameInfo.field[d1 * gameInfo.field_width + d2] === 1) {
-                        gl.uniform1i(gl.getUniformLocation(shaderProgram, "uSampler"), 1);
-                    } else if (gameInfo.field[d1 * gameInfo.field_width + d2] === 2) {
-                        gl.uniform1i(gl.getUniformLocation(shaderProgram, "uSampler"), 2);
-                    } else if (gameInfo.field[d1 * gameInfo.field_width + d2] === 3) {
-                        gl.uniform1i(gl.getUniformLocation(shaderProgram, "uSampler"), 3);
-                    } else if (gameInfo.field[d1 * gameInfo.field_width + d2] === 4) {
-                        gl.uniform1i(gl.getUniformLocation(shaderProgram, "uSampler"), 4);
-                    }
+    //                 if (gameInfo.field[d1 * gameInfo.field_width + d2] === 1) {
+    //                     gl.uniform1i(gl.getUniformLocation(shaderProgram, "uSampler"), 1);
+    //                 } else if (gameInfo.field[d1 * gameInfo.field_width + d2] === 2) {
+    //                     gl.uniform1i(gl.getUniformLocation(shaderProgram, "uSampler"), 2);
+    //                 } else if (gameInfo.field[d1 * gameInfo.field_width + d2] === 3) {
+    //                     gl.uniform1i(gl.getUniformLocation(shaderProgram, "uSampler"), 3);
+    //                 } else if (gameInfo.field[d1 * gameInfo.field_width + d2] === 4) {
+    //                     gl.uniform1i(gl.getUniformLocation(shaderProgram, "uSampler"), 4);
+    //                 }
 
-                    // Draw the cube.
+    //                 // Draw the cube.
 
-                    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeVerticesIndexBuffer);
-                    setMatrixUniforms();
-                    gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
+    //                 gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeVerticesIndexBuffer);
+    //                 setMatrixUniforms();
+    //                 gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
 
-                    // Restore the original matrix
+    //                 // Restore the original matrix
 
-                    mvPopMatrix();
-                }
-            }
-        }
-    }
+    //                 mvPopMatrix();
+    //             }
+    //         }
+    //     }
+    // }
 
     if (typeof players !== 'undefined') {
         for (var key in players) {
