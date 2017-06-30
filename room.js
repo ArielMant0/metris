@@ -1,4 +1,3 @@
-var MAX_PLAYER_COUNT = 4;
 var PLAYER_OFFSET = 4;
 
 module.exports.room = function() {
@@ -37,6 +36,7 @@ module.exports.room = function() {
     this.gameStarted = false;
     this.callback;
     this.stateChanged = false;
+    this.maxPlayers = 4;
 
     this.createRoom = function(roomName, roomID, user, width, height) {
         // Implement your game room (server side) logic here
@@ -46,6 +46,9 @@ module.exports.room = function() {
             this.field_width = width;
             this.field_height = height;
             this.initField();
+            this.gameover = false;
+            this.gameStarted = false;
+            this.stateChanged = false;
             this.addUser(user);
         }
     };
@@ -60,12 +63,13 @@ module.exports.room = function() {
 
     this.callGameOverCallback = function() {
         if (this.callback)
-            this.callback(this.name, this.score);
+            this.callback(this.name, this.players, this.score);
     }
 
     this.startGame = function() {
         this.gameover = false;
         this.gameStarted = true;
+        console.log("Game \"" + this.name + "\" started");
     }
 
     this.initField = function() {
@@ -74,7 +78,7 @@ module.exports.room = function() {
     }
 
     this.addUser = function(user) {
-        if (this.players.length < MAX_PLAYER_COUNT) {
+        if (this.players.length < this.maxPlayers) {
             console.log("Player \'" + user + "\' joined the game \'" + this.name + "\'");
             this.players.push(new this.player(this.players.length, user));
             this.stones.push(new this.stone(this.players.length));
@@ -566,32 +570,37 @@ module.exports.room = function() {
     }
 
     this.gamelogic = function() {
-        // Check if stones are so high the game is over
-        for (j = 0; j < this.stones.length; j++) {
-            for (i = 0; i < this.field_width; i++) {
-                if (this.field[i] !== 0 && i !== this.stones[j].pos[0] && i !== this.stones[j].pos[1] && i !== this.stones[j].pos[2] && i !== this.stones[j].pos[3]) {
-                    this.gameover = true;
-                    this.gameStarted = false;
-                    this.callGameOverCallback();
+        if (!this.gameover) {
+            // Check if the player's stones reached the bottom
+            var changed = false;
+            for (j = 0; j < this.stones.length && !this.isGameOver(); j++) {
+                for (i = 0; i < 4 && this.stones[j].pos[i] !== -1; i++) {
+                    // Check if the player's stone is in the last row or one before that and there
+                    // is no free space under his stone
+                    if ((this.stones[j].pos[i] < (this.field_height-1) * this.field_width && this.field[this.stones[j].pos[i] + this.field_width] > 0) ||
+                        this.stones[j].pos[i] >= (this.field_height-1) * this.field_width) {
+                        this.setStaticStone(j);
+                        changed = this.stonefinished(j) || changed;
+                        break;
+                    }
                 }
             }
+            if (!this.stateChanged)
+                this.stateChanged = changed;
         }
+    }
 
-        // Check if the player's stones reached the bottom
-        var changed = false;
-        for (j = 0; j < this.stones.length; j++) {
-            for (i = 0; i < 4 && this.stones[j].pos[i] !== -1; i++) {
-                // Check if the player's stone is in the last row or one before that and there
-                // is no free space under his stone
-                if (this.stones[j].pos[i] >= (this.field_height - 1) * this.field_width || this.field[this.stones[j].pos[i] + this.field_width] > 0) {
-                    this.setStaticStone(j);
-                    changed = this.stonefinished(j) || changed;
-                    break;
-                }
+    this.isGameOver = function() {
+        // Check if stones are so high the game is over
+        for (i = 0; i < this.field_width; i++) {
+            if (this.field[i] !== 0) {
+                this.gameover = true;
+                this.gameStarted = false;
+                this.callGameOverCallback();
+                return true;
             }
         }
-        if (!this.stateChanged)
-            this.stateChanged = changed;
+        return false;
     }
 
     this.dropStones = function() {

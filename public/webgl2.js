@@ -121,7 +121,8 @@ $(document).ready(function () {
             if (bufView[0] != gameInfo.score)
                 updateScore(bufView[0]);
         } else {
-            gameInfo.score = data.score;
+            if (data.score != gameInfo.score)
+                updateScore(data.score);
         }
     });
 
@@ -141,7 +142,7 @@ $(document).ready(function () {
     });
 
     socket.on('gameover', function() {
-        $('#final-score').html('Final Score: ' + gameInfo.score);
+        $('#gameover-score').html('Final Score: ' + gameInfo.score);
         $('#game-over').css('display', 'block');
         gameRunning = false;
     });
@@ -204,13 +205,31 @@ function isInGame() {
     return gameInfo.lobby !== '';
 }
 
+function reset() {
+    gameInfo.lobby = '';
+    gameInfo.userid = 0;
+    gameInfo.field_width = 0;
+    gameInfo.field_height = 0;
+    gameRunning = false;
+    gameInfo.field = [];
+    level = 1;
+    players = {};
+}
+
 // Send player movement
 function submitmove(key) {
     socket.emit('playermove', { key: key, userid: gameInfo.userid, lobbyname: gameInfo.lobby });
 }
 
 function joinGame(lobby) {
-    socket.emit('join', { lobbyname: lobby, username: gameInfo.username });
+    if (isInGame()) {
+        socket.emit('leave', { lobbyname: lobby, userid: gameInfo.userid, username: gameInfo.username });
+        reset();
+        socket.emit('join', { lobbyname: lobby, username: gameInfo.username });
+    }
+    else {
+        socket.emit('join', { lobbyname: lobby, username: gameInfo.username });
+    }
 }
 
 // Start the game in the current lobby

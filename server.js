@@ -66,14 +66,14 @@ app.get(/\/game\/[a-zA-z0-9]/, function (req, res) {
 // Map of all currently active lobbies
 roomlist = new Map();
 loops = new Map();
-scores = [];
+scores = new Map;
 
 addDefaultScores();
 
 function addDefaultScores() {
-    scores.push({ username: 'Peter', score: 9231 });
-    scores.push({ username: 'Klaus', score: 8829 });
-    scores.push({ username: 'Hannah', score: 9106 });
+    scores.set('Peter', 9231);
+    scores.set('Klaus', 8829);
+    scores.set('Hannah', 9106);
 }
 
 // Create a list of all lobbies
@@ -87,14 +87,19 @@ function getLobbies() {
 
 // Create a list of all highscores
 function getHighscores() {
-    return scores.sort(function(a, b) {
+    list = [];
+    scores.forEach(function(value, key, map) {
+        list.push({name: key, score: value});
+    });
+    list.sort(function(a, b) {
         if (a.score > b.score)
             return -1;
         else if (a.score < b.score)
             return 1;
-        else
-            return 0;
+
+        return 0;
     });
+    return list;
 }
 
 // Generate new room id
@@ -160,6 +165,16 @@ function setEventHandlers() {
             }
         });
 
+        socket.on('leave', function(data) {
+            if (roomlist.has(data.lobbyname)) {
+                game = roomlist.get(data.lobbyname);
+                if (data.userid >= 0 && data.userid <= game.maxPlayers &&
+                    game.players[data.userid].name === data.username) {
+                    game.removeUser(data.userid);
+                }
+            }
+        });
+
         // When a user joins a game
         socket.on('join', function(data) {
             if (roomlist.has(data.lobbyname) && userNotPresent(data.lobbyname, data.username)) {
@@ -185,13 +200,16 @@ function userNotPresent(lobby, name) {
     });
 }
 
-function endGame(lobby, score) {
+function endGame(lobby, players, score) {
     if (loops.has(lobby)) {
         console.log("Gameover in lobby: " + lobby);
         clearInterval(loops.get(lobby).short);
         clearInterval(loops.get(lobby).long);
         //clearInterval(loops.get(lobby).other);
-        io.sockets.in(lobby).emit('gameover');
+        io.sockets.in(lobby).emit('gameover', score);
+        for (i = 0; i < players.length; i++) {
+            scores.set(players[i].name, score);
+        }
     }
 }
 
@@ -200,20 +218,16 @@ function setLoops(game) {
 
     if (!loops.has(game.name)) {
         var l = setInterval(function() {
-            if (!game.gameover && game.gameStarted) {
-                game.dropStones();
-                io.sockets.in(game.name).emit('movePlayers', sendPlayerData(game.stones));
-            }
+            game.dropStones();
+            io.sockets.in(game.name).emit('movePlayers', sendPlayerData(game.stones));
         }, game.speed);
 
         var s = setInterval(function () {
-            if (!game.gameover && game.gameStarted) {
-                game.stateChanged = false;
-                game.gamelogic();
-                if (game.stateChanged) {
-                    io.sockets.in(game.name).emit('moveField', sendFieldData(game.field));
-                    io.sockets.in(game.name).emit('moveScore', sendScoreData(game.score));
-                }
+            game.stateChanged = false;
+            game.gamelogic();
+            if (game.stateChanged) {
+                io.sockets.in(game.name).emit('moveField', sendFieldData(game.field));
+                io.sockets.in(game.name).emit('moveScore', sendScoreData(game.score));
             }
         }, 100);
 
@@ -283,11 +297,11 @@ function OptimizeField(field) {
     return field;
 }
 
-function createDefaultGame() {
+function createDefaultGame(name) {
     // Just for Testing
-    roomlist.set('default', new lobby.room());
-    game = roomlist.get('default');
-    game.createRoom('default', generateRoomID(), 'Admin', 100, 60);
+    roomlist.set(name, new lobby.room());
+    game = roomlist.get(name);
+    game.createRoom(name, generateRoomID(), 'Admin', 60, 30);
     game.setSpeed(500);
     game.removeUser(game.getLastUser());
 }
@@ -296,12 +310,12 @@ function joinDefaultGame(socket) {
     if (roomlist.has('default')) {
         // Join 'default' game
         socket.join('default', function() {
-            gane = roomlist.get('default');
+            game = roomlist.get('default');
             game.addUser('defaultUser');
-            socket.emit('setgameinfo', { lobbyname: 'default', id: game.getLastUser(),
-                width: 30, height: 16, username: 'defaultUser' });
+            socket.emit('setgameinfo', { lobbyname: game.name, id: game.getLastUser(),
+                width: game.field_width, height: game.field_height, username: 'defaultUser' });
+            once = false;
         });
-        once = false;
     }
 }
 
@@ -314,4 +328,5 @@ console.log('Der Server läuft nun auf Port ' + port);
 // Set all event handlers
 setEventHandlers();
 
-createDefaultGame();
+createDefaultGame('default1');
+createDefaultGame('default2');

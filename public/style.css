@@ -20,10 +20,14 @@ footer p {
 #game-over {
     display: none;
     position: absolute;
-    left: 40%;
+    left: 45%;
     top: 40%;
     color: white;
     font-weight: bold;
+}
+
+#gamover-text {
+    font-size: 5;
 }
 
 #player-name {
