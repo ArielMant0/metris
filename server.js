@@ -296,11 +296,11 @@ function OptimizeField(field) {
     return field;
 }
 
-function createDefaultGame(name) {
+function createDefaultGame(name, w, h) {
     // Just for Testing
     roomlist.set(name, new lobby.room());
     game = roomlist.get(name);
-    game.createRoom(name, generateRoomID(), 'Admin', 60, 30);
+    game.createRoom(name, generateRoomID(), 'Admin', w, h);
     game.setSpeed(500);
     game.removeUser(game.getLastUser());
 }
@@ -327,5 +327,5 @@ console.log('Der Server läuft nun auf Port ' + port);
 // Set all event handlers
 setEventHandlers();
 
-createDefaultGame('default1');
-createDefaultGame('default2');
+createDefaultGame('default1', 60, 30);
+createDefaultGame('default2', 30, 16);
