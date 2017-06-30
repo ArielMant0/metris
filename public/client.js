@@ -31,6 +31,7 @@ function sendAjaxListeners(method, url, elem, func) {
 }
 
 function initLobbyListeners() {
+	$('#content').innerHeight($('body').innerHeight() - $('footer').outerHeight() - $('#topnav').outerHeight());
 	if (isLoggedIn()) {
 		$('.lobby-button').each(function() {
 			$(this).on('click', function () {

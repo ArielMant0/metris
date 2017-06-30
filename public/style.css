@@ -104,8 +104,23 @@ footer p {
     margin-bottom: 0;
 }
 
+#leveltext {
+    position: absolute;
+    left: 0;
+    top: 0;
+    padding-left: 10px;
+    color: white;
+    font-weight: bold;
+    margin-bottom: 0;
+}
+
 .lobby-list, .score-list  {
     list-style: none;
+}
+
+.score-list {
+    margin: 0;
+    padding-top: 10px;
 }
 
 #nav-list {

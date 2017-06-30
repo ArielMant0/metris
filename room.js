@@ -181,7 +181,7 @@ module.exports.room = function() {
     }
 
     this.setStaticStone = function(userid) {
-        for (i = 0; i < this.stones[userid].pos.length; i++) {
+        for (i = 0; i < this.stones[userid].pos.length && this.stones[userid].pos[i] != -1; i++) {
             this.field[this.stones[userid].pos[i]] = userid + 1;
         }
         this.stateChanged = true;

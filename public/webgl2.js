@@ -184,6 +184,10 @@ $(document).ready(function () {
 });
 
 function updateScore(newScore) {
+    if (Math.abs(newScore - gameInfo.score) === gameInfo.field_width) {
+        level++;
+        $('#leveltext').html('Level: ' + level);
+    }
     gameInfo.score = newScore;
     $('#scoretext').html('Score: ' + gameInfo.score);
 }
@@ -1036,7 +1040,7 @@ function render() {
     if (typeof gameInfo.field !== 'undefined') {
         for (d1 = gameInfo.field_height-1; d1 >= 0 && empty < gameInfo.field_width; d1--) {
             empty = 0;
-            for (d2 = gameInfo.field_width; d2 >= 0; d2--) {
+            for (d2 = gameInfo.field_width-1; d2 >= 0; d2--) {
                 if (gameInfo.field[d1 * gameInfo.field_width + d2] > 0 && gameInfo.field[d1 * gameInfo.field_width + d2] < 5) {
 
                     empty++;
