@@ -3,8 +3,7 @@ var express = require('express')
 ,   server = require('http').createServer(app)
 ,   io = require('socket.io')(server, { 'transports': ['websocket', 'polling'] })
 ,   conf = require('./config.json')
-,   lobby = require('./room.js')
-,   authentication = require('express-authentication');
+,   lobby = require('./room.js');
 
 var once = true;
 var last = 0;
