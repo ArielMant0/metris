@@ -937,7 +937,7 @@ function render() {
     ///////////////////////////////////////
     // Background
     ///////////////////////////////////////
-    /*gl.disable(gl.DEPTH_TEST);
+    gl.disable(gl.DEPTH_TEST);
 
     gl.activeTexture(gl.TEXTURE5);
     gl.bindTexture(gl.TEXTURE_2D, spaceBackground);
@@ -953,13 +953,13 @@ function render() {
 
     mvPopMatrix();
 
-    gl.enable(gl.DEPTH_TEST);*/
+    gl.enable(gl.DEPTH_TEST);
 
 
     ///////////////////////////////////////
     // ParticleSystem
     ///////////////////////////////////////
-    /*initParticleSystem2();
+    initParticleSystem2();
 
     // Rotate/Move triangles
     transform();
@@ -986,7 +986,7 @@ function render() {
 
     // DAS IST ALLES SO DUMM !!!
     gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 0, null);
-    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 1, null);*/
+    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 1, null);
 
 
     ///////////////////////////////////////
