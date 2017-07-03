@@ -204,12 +204,14 @@ html(lang='en')
                     a(href='#', id='get-scores') Highscores
                 li
                     a(href='#', id='get-game') Game
-            span(id='player-name') Not Logged In
+            div(id='player-info')
+                span(id='player-name') Not Logged In
+                button(id='login-button') Login
         section
             div(class='modal', id='login-modal')
                 div(class='modal-content')
                     span(class='close' id='close-login-modal') &times;
-                    input(type='text', id='login-name', placeholder='Your Name')
+                    input(type='text', id='login-name', required, placeholder='Your Username')
                     br
                     button(type='submit', id='submit-login') Login
         section(id='content') Content here ...

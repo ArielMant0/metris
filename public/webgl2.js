@@ -81,6 +81,8 @@ $(document).ready(function () {
     // WebSocket
     socket = io();
 
+    reset();
+
     // Main music for the game
     audio = new Audio('MUSIC.mp3');
 
@@ -93,6 +95,11 @@ $(document).ready(function () {
         var audio2 = new Audio('MUSIC2.mp3');
         audio2.play();
     });
+
+    socket.on('showGame', function() {
+        if (gameInfo.lobby)
+            loadGame({ data: { gameID: gameInfo.lobby }});
+    })
 
     socket.on('moveField', function (data) {
         if (readBinary) {
@@ -137,6 +144,7 @@ $(document).ready(function () {
             gameInfo.field = data.field;
         }
         gameInfo.score = 0;
+        level = 1;
         gameRunning = true;
         updateScore(gameInfo.score);
     });
@@ -144,8 +152,13 @@ $(document).ready(function () {
     socket.on('gameover', function() {
         $('#gameover-score').html('Final Score: ' + gameInfo.score);
         $('#game-over').css('display', 'block');
-        gameRunning = false;
+        reset();
     });
+
+    socket.on('dataerror', function(data) {
+        alert(data);
+        sendAjaxListeners('get', '/lobbies', '#content', initLobbyListeners);
+    })
 
     socket.on('setgameinfo', function(data) {
         gameInfo.lobby = data.lobbyname;
@@ -153,6 +166,9 @@ $(document).ready(function () {
         gameInfo.field_width = data.width;
         gameInfo.field_height = data.height;
         gameInfo.username = data.username;
+        //console.log("Created game " + gameInfo.lobby + " with: width = " + gameInfo.field_width + ", height = " +
+        //    gameInfo.field_height + ", userid = " + gameInfo.userid + ", username = " + gameInfo.username);
+
     });
 
     $('#get-lobbies').on('click', function () {
@@ -167,10 +183,12 @@ $(document).ready(function () {
         // A, E, Q, D, S
         if (gameRunning && (e.which == 65 || e.which == 69 || e.which == 81 || e.which == 68 || e.which == 83)) {
             submitmove(e.which, gameInfo.userid);
+        } else if (gameRunning && e.which == 27) {
+            closeLobby();
         } else if (gameRunning && e.which == 49) {
             level = 1;
             resetBuffer();
-        } else if (gameRunning &&e.which == 50) {
+        } else if (gameRunning && e.which == 50) {
             level = 2;
             resetBuffer();
         } else if (gameRunning && e.which == 51) {
@@ -183,6 +201,10 @@ $(document).ready(function () {
     });
 });
 
+function closeLobby() {
+    socket.emit('endGame', { lobbyname: gameInfo.lobby, userid: gameInfo.userid });
+}
+
 function updateScore(newScore) {
     if (Math.abs(newScore - gameInfo.score) === gameInfo.field_width) {
         level++;
@@ -192,9 +214,10 @@ function updateScore(newScore) {
     $('#scoretext').html('Score: ' + gameInfo.score);
 }
 
-function createLobby(lobby, fwidth, fheight) {
+function createLobby(lobby, fwidth, fheight, gspeed) {
     if (gameInfo.username)
-        socket.emit('createlobby', { lobbyname: lobby, username: gameInfo.username, width: fwidth, height: fheight });
+        socket.emit('createlobby', { lobbyname: lobby, username: gameInfo.username,
+                                     width: fwidth, height: fheight, speed: gspeed });
 }
 
 function setPlayerName(name) {
@@ -214,6 +237,7 @@ function reset() {
     gameInfo.userid = 0;
     gameInfo.field_width = 0;
     gameInfo.field_height = 0;
+    gameInfo.score = 0;
     gameRunning = false;
     gameInfo.field = [];
     level = 1;
@@ -226,12 +250,11 @@ function submitmove(key) {
 }
 
 function joinGame(lobby) {
-    if (isInGame()) {
-        socket.emit('leave', { lobbyname: lobby, userid: gameInfo.userid, username: gameInfo.username });
+    if (isInGame() && lobby != gameInfo.lobby) {
+        socket.emit('leave', { lobbyname: gameInfo.lobby, userid: gameInfo.userid, username: gameInfo.username });
         reset();
         socket.emit('join', { lobbyname: lobby, username: gameInfo.username });
-    }
-    else {
+    } else if (!isInGame()) {
         socket.emit('join', { lobbyname: lobby, username: gameInfo.username });
     }
 }

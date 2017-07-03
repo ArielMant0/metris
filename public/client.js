@@ -32,6 +32,7 @@ function sendAjaxListeners(method, url, elem, func) {
 
 function initLobbyListeners() {
 	$('#content').innerHeight($('body').innerHeight() - $('footer').outerHeight() - $('#topnav').outerHeight());
+
 	if (isLoggedIn()) {
 		$('.lobby-button').each(function() {
 			$(this).on('click', function () {
@@ -40,6 +41,10 @@ function initLobbyListeners() {
 				loadGame({ data: { gameID: lobbyname }});
 			});
 		});
+
+		if (isInGame())
+			$('#'+gameInfo.lobby + '-button').text('Start');
+
 		$('#create-lobby').on('click', function() {
 			createLobbyForm();
 		});
@@ -55,9 +60,18 @@ function initLobbyListeners() {
 		$('#create-modal').css('display', 'none');
 	});
 
+	$('#login-button').on('click', function() {
+    	if (isLoggedIn())
+    		logout();
+    	else
+    		joinForm();
+    });
+
 	$('#submit-lobby').on('click', function() {
-		createLobby($('#lobby-name').val(), $('#field-width').val(), $('#field-height').val());
-		loadGame({ data: { gameID: $('#lobby-name').val() }});
+		createLobby($('#lobby-name').val(), parseInt($('#field-width').val()),
+					parseInt($('#field-height').val()), parseInt($('#game-speed').val()));
+		$('#create-modal').css('display', 'none');
+		sendAjaxListeners('get', '/lobbies', '#content', initLobbyListeners);
 	});
 }
 
@@ -129,6 +143,7 @@ function setEventListeners() {
 			setPlayerName($('#login-name').val());
 			$('#player-name').html($('#login-name').val());
 			$('#login-modal').css('display', 'none');
+			$('#login-button').html('Logout');
 			sendAjaxListeners('get', '/lobbies', '#content', initLobbyListeners);
 		}
 		else {

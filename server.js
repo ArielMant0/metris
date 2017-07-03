@@ -8,6 +8,10 @@ var express = require('express')
 var once = true;
 var last = 0;
 
+// Default lobbies
+var def1 = 'default1';
+var def2 = 'default2';
+
 var useBinary = conf.binary;
 
 // Webserver
@@ -15,28 +19,13 @@ var useBinary = conf.binary;
 var port = process.env.PORT || conf.port;
 server.listen(port);
 
-// Template directory
+// Template directory and engine
 app.set('views', './views');
 app.set('view engine', 'pug');
 
 // Routing
 // Deliver static files
 app.use(express.static(__dirname + '/public'));
-
-// app.use(function myauth(req, res, next) {
-//     req.challenge = req.get('Authorization');
-//     req.authenticated = req.authentication === 'secret';
-
-//     // provide the result of the authentication; generally some kind of user
-//     // object on success and some kind of error as to why authentication failed
-//     // otherwise.
-//     if (req.authenticated) {
-//         req.authentication = { username: getUserName() };
-//     } else {
-//         req.authentication = { error: 'INVALID_API_KEY' };
-//     }
-//     next();
-// });
 
 // Main Site
 app.get('/', function (req, res) {
@@ -156,27 +145,31 @@ function setEventHandlers() {
                     game = roomlist.get(data.lobbyname);
                     game.createRoom(data.lobbyname, generateRoomID(), data.username,
                         data.width, data.height);
+                    game.setSpeed(data.speed);
 
                     // Tell socket game info
                     socket.emit('setgameinfo', { lobbyname: game.name, id: game.getLastUser(),
                         width: game.field_width, height: game.field_height, username: data.username });
                 });
+            } else {
+                socket.emit('dataerror', { info: 'Lobby ' + data.lobbyname + ' already exists!'})
             }
         });
 
         socket.on('leave', function(data) {
             if (roomlist.has(data.lobbyname)) {
                 game = roomlist.get(data.lobbyname);
-                if (data.userid >= 0 && data.userid <= game.maxPlayers &&
-                    game.players[data.userid].name === data.username) {
+                if (game.players.length >= data.userid && game.players[data.userid].name === data.username) {
                     game.removeUser(data.userid);
+                    if (game.gameStarted && !game.gameover)
+                        io.sockets.in(game.name).emit('movePlayers', sendPlayerData(game.players));
                 }
             }
         });
 
         // When a user joins a game
         socket.on('join', function(data) {
-            if (roomlist.has(data.lobbyname) && userNotPresent(data.lobbyname, data.username)) {
+            if (roomlist.has(data.lobbyname) && !userInGame(data.lobbyname, data.username)) {
                 socket.join(data.lobbyname, function() {
                     game = roomlist.get(data.lobbyname);
                     game.addUser(data.username);
@@ -188,14 +181,34 @@ function setEventHandlers() {
                     if (game.gameStarted && !game.gameover)
                         socket.emit('begin', sendFieldData(game.field));
                 });
+            } else if (roomlist.has(data.lobbyname) && userInGame(data.lobbyname, data.username)) {
+                game = roomlist.get(data.lobbyname);
+                if (game.gameStarted) {
+                    socket.emit('showGame');
+                } else {
+                    game.startGame();
+                    game.setGameOverCallback(endGame);
+
+                    // Start game loops for this game
+                    setLoops(game);
+                    socket.emit('begin', sendFieldData(game.field));
+                }
+            }
+        });
+
+        socket.on('endGame', function(data) {
+            if (roomlist.has(data.lobbyname)) {
+                game = roomlist.get(data.lobbyname);
+                if (game.isAdmin(data.userid))
+                    endGame(game.name, game.players, game.score);
             }
         });
     });
 }
 
-function userNotPresent(lobby, name) {
-    return roomlist.get(lobby).players.every(function(element, index, array) {
-        return element.name !== name;
+function userInGame(lobby, name) {
+    return roomlist.get(lobby).players.some(function(element, index, array) {
+        return element.name === name;
     });
 }
 
@@ -204,11 +217,15 @@ function endGame(lobby, players, score) {
         console.log("Gameover in lobby: " + lobby);
         clearInterval(loops.get(lobby).short);
         clearInterval(loops.get(lobby).long);
-        //clearInterval(loops.get(lobby).other);
         io.sockets.in(lobby).emit('gameover', score);
         for (i = 0; i < players.length; i++) {
             scores.set(players[i].name, score);
         }
+        // TODO display dialog to ask if game should be restarted
+        if (lobby === def1 || lobby === def2)
+            game.reset();
+        else
+            roomlist.delete(lobby);
     }
 }
 
@@ -230,14 +247,8 @@ function setLoops(game) {
             }
         }, 100);
 
-        // var o = setInterval(function () {
-        //     if (!game.gameover && game.gameStarted)
-        //         io.sockets.in(game.name).emit('move', { field: fieldAsBinary(game.field),
-        //             score: scoreAsBinary(game.score) });
-        // }, 10);
-
         // Store IDs so we can stop intervals once the game is over
-        loops.set(game.name, { long: l, short: s }); // other: o
+        loops.set(game.name, { long: l, short: s });
     }
 }
 
@@ -296,20 +307,29 @@ function OptimizeField(field) {
     return field;
 }
 
-function createDefaultGame(name, w, h) {
+function createDefaultGame(name, w, h, s) {
     // Just for Testing
     roomlist.set(name, new lobby.room());
     game = roomlist.get(name);
     game.createRoom(name, generateRoomID(), 'Admin', w, h);
-    game.setSpeed(500);
+    game.setSpeed(s);
     game.removeUser(game.getLastUser());
 }
 
 function joinDefaultGame(socket) {
-    if (roomlist.has('default')) {
-        // Join 'default' game
-        socket.join('default', function() {
-            game = roomlist.get('default');
+    if (roomlist.has(def1)) {
+        // Join first game
+        socket.join(def1, function() {
+            game = roomlist.get(def1);
+            game.addUser('defaultUser');
+            socket.emit('setgameinfo', { lobbyname: game.name, id: game.getLastUser(),
+                width: game.field_width, height: game.field_height, username: 'defaultUser' });
+            once = false;
+        });
+    } else if (roomlist.has(def2)) {
+        // Join second game
+        socket.join(def2, function() {
+            game = roomlist.get(def2);
             game.addUser('defaultUser');
             socket.emit('setgameinfo', { lobbyname: game.name, id: game.getLastUser(),
                 width: game.field_width, height: game.field_height, username: 'defaultUser' });
@@ -322,10 +342,10 @@ function noDefaultPlayer(element, index, array) {
     return element.name !== 'defaultUser';
 }
 
-console.log('Der Server läuft nun auf Port ' + port);
+console.log('Server is running on port: ' + port);
 
 // Set all event handlers
 setEventHandlers();
 
-createDefaultGame('default1', 60, 30);
-createDefaultGame('default2', 30, 16);
+createDefaultGame(def1, 60, 30, 500);
+createDefaultGame(def2, 30, 16, 750);

@@ -7,7 +7,7 @@ html, body {
 
 footer {
     margin: 0;
-    background-color: #333;
+    background-color: #333333;
     display: flex;
     justify-content: space-around;
     align-items: center;
@@ -15,6 +15,7 @@ footer {
 
 footer p {
     color: white;
+    margin: 10px;
 }
 
 #game-over {
@@ -30,7 +31,7 @@ footer p {
     font-size: 5;
 }
 
-#player-name {
+#player-info {
     position: absolute;
     top: 0;
     right: 0;
@@ -38,6 +39,10 @@ footer p {
     padding-right: 10px;
     color: white;
     font-weight: bold;
+}
+
+#player-name {
+    margin-right: 5px;
 }
 
 .modal {
@@ -63,7 +68,15 @@ footer p {
     margin: 15% auto; /* 15% from the top and centered */
     padding: 20px;
     border: 1px solid #888;
-    width: 80%; /* Could be more or less, depending on screen size */
+    width: 50%; /* Could be more or less, depending on screen size */
+}
+
+.create-entry {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 5px;
 }
 
 /* The Close Button */
@@ -144,28 +157,28 @@ footer p {
 }
 
 #nav-list li a:hover {
-    background-color: #606060;
+    background-color: #171717;
 }
 
 .lobby-button {
     border-radius: 50%;
     width: 40px;
     height: 40px;
-    border: 1px solid #44AB4B;
-    background-color: #44AB4B;
+    border: 1px solid #6794A5;
+    background-color: #82BCD1;
 }
 
 .lobby-button:hover {
-    background-color: #B5DE86;
+    background-color: #6794A5;
 }
 
 .lobby-entry {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background-color: #C0C0C0;
+    background-color: #D4D4D4;
     border-radius: 25px;
-    padding: 15px;
+    padding: 10px;
     margin: 5px;
 }
 
@@ -173,4 +186,17 @@ footer p {
     border-radius: 25px;
     margin-top: 5px;
     background-color: #82BCD1;
+}
+
+#create-lobby:hover {
+    background-color: #6794A5;
+}
+
+#login-button {
+    border-radius: 25px;
+    background-color: #82BCD1;
+}
+
+#login-button:hover {
+    background-color: #6794A5;
 }

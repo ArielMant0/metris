@@ -3,22 +3,30 @@ button(id='create-lobby') Create Lobby
 div(class='modal', id='create-modal')
     div(class='modal-content')
         span(class='close' id='close-create-modal') &times;
-        input(type='text', id='lobby-name', placeholder='Lobby Name')
-        select(id='field-width')
-            option 30
-            option 40
-            option 60
-            option 100
-        select(id='field-height')
-            option 16
-            option 20
-            option 40
-            option 60
-        select(id='game-speed')
-            option 1000
-            option 750
-            option 500
-            option 250
+        span(class='create-entry')
+            label(for='lobby-name') Lobby Name
+            input(type='text', id='lobby-name', required)
+        span(class='create-entry')
+            label(for='field-width') Field Width
+            select(id='field-width')
+                option 30
+                option 40
+                option 60
+                option 100
+        span(class='create-entry')
+            label(for='field-height') Field Height
+            select(id='field-height')
+                option 16
+                option 20
+                option 40
+                option 60
+        span(class='create-entry')
+            label(for='game-speed') Stone Speed
+            select(id='game-speed')
+                option 1000
+                option 750
+                option 500
+                option 250
         button(type='submit', id='submit-lobby') Create
 
 ul(class='lobby-list')
