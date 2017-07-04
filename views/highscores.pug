@@ -1,3 +1,7 @@
-ul(class='score-list')
+ol(class='score-list')
     each player in scores
-        li(class='score-entry') #{player.score} #{player.name}
+        li(class='score-entry')
+            span(id='score-name') #{player.name}
+            span(id='score-value') (#{player.score})
+            span(id='score-game') #{player.game}
+            span(id='score-date') #{player.date}

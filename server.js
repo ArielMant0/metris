@@ -3,16 +3,24 @@ var express = require('express')
 ,   server = require('http').createServer(app)
 ,   io = require('socket.io')(server, { 'transports': ['websocket', 'polling'] })
 ,   conf = require('./config.json')
-,   lobby = require('./room.js');
+,   lobby = require('./room.js')
+,   sql = require('sqlite3');
 
 var once = true;
 var last = 0;
+var DATABASE = 'users.db';
 
 // Default lobbies
 var def1 = 'default1';
 var def2 = 'default2';
 
 var useBinary = conf.binary;
+
+// Map of all currently active lobbies
+var roomlist = new Map();
+var loops = new Map();
+var scores = [];
+var users = new Map();
 
 // Webserver
 // Use Port X
@@ -42,7 +50,7 @@ app.get('/lobbies', function (req, res) {
 // Highscores
 app.get('/highscores', function (req, res) {
     // Render highscores.pug
-    res.render('highscores', { scores: getHighscores() });
+    res.render('highscores', { scores: scores });
 });
 
 // Game
@@ -51,18 +59,14 @@ app.get(/\/game\/[a-zA-z0-9]/, function (req, res) {
     res.render('game');
 });
 
-// Map of all currently active lobbies
-roomlist = new Map();
-loops = new Map();
-scores = new Map;
+// Errors
+app.get('/error', function (req, res) {
+    // Render error.pug
+    res.render('error', { msg: lastError });
+});
 
-addDefaultScores();
-
-function addDefaultScores() {
-    scores.set('Peter', 9231);
-    scores.set('Klaus', 8829);
-    scores.set('Hannah', 9106);
-}
+// Database stuff
+var db = new sql.Database(DATABASE);
 
 // Create a list of all lobbies
 function getLobbies() {
@@ -73,12 +77,48 @@ function getLobbies() {
     return list;
 }
 
-// Create a list of all highscores
-function getHighscores() {
-    list = [];
-    scores.forEach(function(value, key, map) {
-        list.push({name: key, score: value});
+function createScoreTable() {
+    db.serialize(function() {
+        db.run('CREATE TABLE IF NOT EXISTS highscores' +
+            '(name TEXT PRIMARY KEY NOT NULL,' +
+            ' score INT NOT NULL,' +
+            ' date TEXT NOT NULL,' +
+            ' game TEXT NOT NULL)', [], function(error, rows) {
+        if (error)
+            console.log('Creating highscores table failed: ' + error);
+        });
+    })
+}
+
+function updateScoreTable(name, score, game) {
+    var currentScore = score;
+    db.get('SELECT * FROM highscores WHERE name = ?', [name], function(error, row) {
+        if (!error && row)
+            currentScore = row.score > currentScore ? row.score : currentScore;
     });
+
+    db.serialize(function() {
+        db.run('INSERT OR REPLACE INTO highscores (name, score, date, game) VALUES ($n, $s, $d, $g)',
+            { $n: name, $s: currentScore, $d: new Date().toUTCString(), $g: game }, function(error) {
+            if (error)
+                console.log('Setting new user score failed: ' + "[" + name + ", " + score + "]\n" + error);
+        });
+    });
+}
+
+// Create a list of all highscores
+function updateHighscores() {
+    db.serialize(function() {
+        db.all('SELECT * FROM highscores', [], function(error, rows) {
+            if (!error && rows.length > 0)
+                sortScores(rows);
+            else if (error)
+                console.log('Getting highscores failed: ' + error);
+        });
+    });
+}
+
+function sortScores(list) {
     list.sort(function(a, b) {
         if (a.score > b.score)
             return -1;
@@ -87,7 +127,7 @@ function getHighscores() {
 
         return 0;
     });
-    return list;
+    scores = list.slice(0);
 }
 
 // Generate new room id
@@ -152,7 +192,27 @@ function setEventHandlers() {
                         width: game.field_width, height: game.field_height, username: data.username });
                 });
             } else {
-                socket.emit('dataerror', { info: 'Lobby ' + data.lobbyname + ' already exists!'})
+                setLastError(0, data.lobbyname);
+                socket.emit('dataerror');
+            }
+        });
+
+        socket.on('login', function(data) {
+            if (!users.has(data.username)) {
+                users.set(data.username, '');
+                socket.emit('setuser', { name: data.username });
+                console.log("Player \'" + data.username + "\' logged in");
+            } else {
+                setLastError(1, data.username);
+                socket.emit('dataerror');
+            }
+        });
+
+        socket.on('logout', function(data) {
+            if (users.has(data.username)) {
+                users.delete(data.username);
+                socket.emit('setuser', { name: '' });
+                console.log("Player \'" + data.username + "\' logged out");
             }
         });
 
@@ -206,6 +266,15 @@ function setEventHandlers() {
     });
 }
 
+function setLastError(num, arg) {
+    switch(num) {
+        case 0: lastError = 'Lobby ' + arg + ' already exists'; break;
+        case 1: lastError = 'User ' + arg + ' is already logged in'; break;
+        case 2: lastError = 'Lalala'; break;
+        default: lastError = 'Error Occured';
+    }
+}
+
 function userInGame(lobby, name) {
     return roomlist.get(lobby).players.some(function(element, index, array) {
         return element.name === name;
@@ -218,9 +287,15 @@ function endGame(lobby, players, score) {
         clearInterval(loops.get(lobby).short);
         clearInterval(loops.get(lobby).long);
         io.sockets.in(lobby).emit('gameover', score);
-        for (i = 0; i < players.length; i++) {
-            scores.set(players[i].name, score);
+
+        // Update scores if greater than 0
+        if (score > 0) {
+            for (i = 0; i < players.length; i++) {
+                updateScoreTable(players[i].name, score, lobby);
+            }
+            updateHighscores();
         }
+
         // TODO display dialog to ask if game should be restarted
         if (lobby === def1 || lobby === def2)
             game.reset();
@@ -343,6 +418,10 @@ function noDefaultPlayer(element, index, array) {
 }
 
 console.log('Server is running on port: ' + port);
+
+// Init database
+createScoreTable();
+updateHighscores();
 
 // Set all event handlers
 setEventHandlers();

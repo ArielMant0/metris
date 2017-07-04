@@ -31,5 +31,5 @@ div(class='modal', id='create-modal')
 
 ul(class='lobby-list')
     each lobby in lobbies
-        li(class='lobby-entry', id=lobby.name) Lobby: #{lobby.name}
+        li(class='lobby-entry', id=lobby.name) #{lobby.name}
             button(class='lobby-button', id=lobby.name+'-button') Join

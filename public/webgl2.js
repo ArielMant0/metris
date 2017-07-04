@@ -80,9 +80,6 @@ var gameRunning = false;
 $(document).ready(function () {
     // WebSocket
     socket = io();
-
-    reset();
-
     // Main music for the game
     audio = new Audio('MUSIC.mp3');
 
@@ -90,6 +87,8 @@ $(document).ready(function () {
       audio.currentTime = 7;
       audio.play();
     };
+
+    reset();
 
     socket.on('music', function () {
         var audio2 = new Audio('MUSIC2.mp3');
@@ -112,9 +111,9 @@ $(document).ready(function () {
 
     socket.on('movePlayers', function (data) {
         if (readBinary) {
-            // var bufView = new Uint16Array(data);
-            // if (bufView[0] != gameInfo.score)
-            //     updateScore(bufView[0]);
+            var bufView = new Uint16Array(data);
+            if (bufView[0] != gameInfo.score)
+                updateScore(bufView[0]);
         } else {
             for (var key in data) {
                 players[key] = data[key];
@@ -149,16 +148,19 @@ $(document).ready(function () {
         updateScore(gameInfo.score);
     });
 
+    socket.on('setuser', function(data) {
+        gameInfo.username = data.name;
+    })
+
     socket.on('gameover', function() {
         $('#gameover-score').html('Final Score: ' + gameInfo.score);
         $('#game-over').css('display', 'block');
         reset();
     });
 
-    socket.on('dataerror', function(data) {
-        alert(data);
-        sendAjaxListeners('get', '/lobbies', '#content', initLobbyListeners);
-    })
+    socket.on('dataerror', function() {
+        sendAjax('get', '/error', '#content');
+    });
 
     socket.on('setgameinfo', function(data) {
         gameInfo.lobby = data.lobbyname;
@@ -166,9 +168,7 @@ $(document).ready(function () {
         gameInfo.field_width = data.width;
         gameInfo.field_height = data.height;
         gameInfo.username = data.username;
-        //console.log("Created game " + gameInfo.lobby + " with: width = " + gameInfo.field_width + ", height = " +
-        //    gameInfo.field_height + ", userid = " + gameInfo.userid + ", username = " + gameInfo.username);
-
+        colourUsername();
     });
 
     $('#get-lobbies').on('click', function () {
@@ -205,6 +205,16 @@ function closeLobby() {
     socket.emit('endGame', { lobbyname: gameInfo.lobby, userid: gameInfo.userid });
 }
 
+function colourUsername() {
+    switch (gameInfo.userid) {
+        case 0: $('#player-name').css('color', 'green'); break;
+        case 1: $('#player-name').css('color', 'red'); break;
+        case 2: $('#player-name').css('color', 'blue'); break;
+        case 3: $('#player-name').css('color', 'yellow'); break;
+        default: break;
+    }
+}
+
 function updateScore(newScore) {
     if (Math.abs(newScore - gameInfo.score) === gameInfo.field_width) {
         level++;
@@ -233,6 +243,7 @@ function isInGame() {
 }
 
 function reset() {
+    $('#player-name').css('color', 'white');
     gameInfo.lobby = '';
     gameInfo.userid = 0;
     gameInfo.field_width = 0;
@@ -242,6 +253,8 @@ function reset() {
     gameInfo.field = [];
     level = 1;
     players = {};
+    audio.pause();
+    audio.currentTime = 0;
 }
 
 // Send player movement
@@ -259,16 +272,26 @@ function joinGame(lobby) {
     }
 }
 
+function sendLogin(name) {
+    socket.emit('login', { username: name });
+}
+
+function sendLogout() {
+    socket.emit('logout', { username: gameInfo.username });
+}
+
 // Start the game in the current lobby
 function startgame() {
     // Creates canvas to draw on
     start();
 
     // Socket senden
-    if (!gameRunning)
+    if (!gameRunning) {
+        audio.currentTime = 0;
         socket.emit('startgame', { width: gameInfo.field_width, height: gameInfo.field_height, lobbyname: gameInfo.lobby });
-    else
+    } else {
         socket.emit('updategame', { lobbyname: gameInfo.lobby });
+    }
 
     audio.play();
 }
@@ -669,7 +692,7 @@ function initTextures() {
     spaceBackground = gl.createTexture();
     cubeImageSpace = new Image();
     cubeImageSpace.onload = function () { handleTextureLoaded(cubeImageSpace, spaceBackground); }
-    cubeImageSpace.src = "Space-Background.png";
+    cubeImageSpace.src = "The-Edge-of-Space.jpg"; //"Space-Background.png";
 }
 
 function handleTextureLoaded(image, texture) {

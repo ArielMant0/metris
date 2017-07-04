@@ -19,9 +19,9 @@ module.exports.room = function() {
     };
 
     // Player constructor
-    this.player = function(userid, player, status) {
+    this.player = function(userid, name, status) {
         this.id = userid;
-        this.name = player;
+        this.name = name;
         this.isAdmin = status;
     };
 

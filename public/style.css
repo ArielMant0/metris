@@ -127,13 +127,19 @@ footer p {
     margin-bottom: 0;
 }
 
-.lobby-list, .score-list  {
+.lobby-list {
     list-style: none;
 }
 
 .score-list {
     margin: 0;
     padding-top: 10px;
+    color: black;
+}
+
+.score-entry > span {
+    margin-right: 15px;
+    font-weight: bold;
 }
 
 #nav-list {
@@ -170,6 +176,14 @@ footer p {
 
 .lobby-button:hover {
     background-color: #6794A5;
+}
+
+.joined {
+    background-color: #429B22;
+}
+
+.joined:hover {
+    background-color: #52BF2A;
 }
 
 .lobby-entry {

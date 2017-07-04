@@ -42,30 +42,38 @@ function initLobbyListeners() {
 			});
 		});
 
-		if (isInGame())
+		if (isInGame()) {
 			$('#'+gameInfo.lobby + '-button').text('Start');
+			$('#'+gameInfo.lobby + '-button').addClass('joined');
+		}
 
 		$('#create-lobby').on('click', function() {
-			createLobbyForm();
+			lobbyForm();
 		});
+
+		$('#login-button').off();
+		$('#login-button').text('Logout');
+		$('#login-button').on('click', function() {
+    		logout();
+    	});
 	}
 	else {
 		$('.lobby-button').each(function() {
 			$(this).on('click', joinForm);
+			$(this).removeClass('joined');
 		});
+
 		$('#create-lobby').on('click', joinForm);
+
+		$('#login-button').text('Login');
+		$('#player-name').text('');
+		$('#login-button').off();
+		$('#login-button').on('click', joinForm);
 	}
 
 	$('#close-create-modal').on('click', function() {
 		$('#create-modal').css('display', 'none');
 	});
-
-	$('#login-button').on('click', function() {
-    	if (isLoggedIn())
-    		logout();
-    	else
-    		joinForm();
-    });
 
 	$('#submit-lobby').on('click', function() {
 		createLobby($('#lobby-name').val(), parseInt($('#field-width').val()),
@@ -73,6 +81,22 @@ function initLobbyListeners() {
 		$('#create-modal').css('display', 'none');
 		sendAjaxListeners('get', '/lobbies', '#content', initLobbyListeners);
 	});
+}
+
+function logout() {
+	reset();
+	sendLogout();
+	sendAjaxListeners('get', '/lobbies', '#content', initLobbyListeners);
+
+}
+
+function login(name) {
+	if (name.length > 0) {
+		sendLogin(name);
+		$('#player-name').text(name);
+		$('#login-modal').css('display', 'none');
+		sendAjaxListeners('get', '/lobbies', '#content', initLobbyListeners);
+	}
 }
 
 function loadLobbies(event) {
@@ -94,7 +118,7 @@ function loadGame(event) {
 	}
 }
 
-function createLobbyForm(event) {
+function lobbyForm(event) {
 	$('#create-modal').css('display', 'block');
 	$('#lobby-name').focus();
 }
@@ -109,24 +133,24 @@ function joinForm(event) {
 function setEventListeners() {
 
     $('#get-lobbies').on('click', function() {
-    	$(this).attr('class', 'active');
-    	$('#get-scores').removeAttr('class');
-    	$('#get-game').removeAttr('class');
+	    $(this).addClass('active');
+    	$('#get-scores').removeClass('class');
+    	$('#get-game').removeClass('class');
     	loadLobbies();
     });
 
     $('#get-scores').on('click', function() {
-    	$(this).attr('class', 'active');
-    	$('#get-lobbies').removeAttr('class');
-    	$('#get-game').removeAttr('class');
+	    $(this).addClass('active');
+    	$('#get-lobbies').removeClass('class');
+    	$('#get-game').removeClass('class');
     	loadHighscores();
     });
 
     $('#get-game').on('click', function() {
     	if (isLoggedIn() && isInGame()) {
-	    	$(this).attr('class', 'active');
-	    	$('#get-scores').removeAttr('class');
-	    	$('#get-lobbies').removeAttr('class');
+	    	$(this).addClass('active');
+	    	$('#get-scores').removeClass('class');
+	    	$('#get-lobbies').removeClass('class');
 	    	loadGame({ data: { gameID: gameInfo.lobby }});
 	    } else {
 	    	alert("You need to be logged in and inside a lobby to play!");
@@ -139,15 +163,6 @@ function setEventListeners() {
 	});
 	// Store username on submit
 	$('#submit-login').on('click', function() {
-		if ($('#login-name').val()) {
-			setPlayerName($('#login-name').val());
-			$('#player-name').html($('#login-name').val());
-			$('#login-modal').css('display', 'none');
-			$('#login-button').html('Logout');
-			sendAjaxListeners('get', '/lobbies', '#content', initLobbyListeners);
-		}
-		else {
-			alert("You need to enter a name to play with!");
-		}
+		login($('#login-name').val());
 	});
 };
