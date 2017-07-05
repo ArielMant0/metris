@@ -59,7 +59,7 @@ var instanceOffsets;
 var instanceRotations;
 var instanceColors;
 
-var players = {};
+var players = [];
 var gameInfo = {
     userid: 0,
     lobby: '',
@@ -100,35 +100,35 @@ $(document).ready(function () {
             loadGame({ data: { gameID: gameInfo.lobby }});
     })
 
-    socket.on('moveField', function (data) {
+    socket.on('moveField', function (field) {
         if (readBinary) {
-            var bufView = new Uint8Array(data);
+            var bufView = new Uint8Array(field);
             gameInfo.field = Array.prototype.slice.call(bufView);
         } else {
-            gameInfo.field = data.field;
+            gameInfo.field = field;
         }
     });
 
-    socket.on('movePlayers', function (data) {
-        if (readBinary) {
-            var bufView = new Uint16Array(data);
-            if (bufView[0] != gameInfo.score)
-                updateScore(bufView[0]);
-        } else {
-            for (var key in data) {
-                players[key] = data[key];
-            }
-        }
+    socket.on('movePlayers', function (stones) {
+        if (readBinary)
+            var bufView = new Uint16Array(stones);
+        else
+            players = stones.slice(0);
     });
 
-    socket.on('moveScore', function (data) {
+    socket.on('moveScore', function (score, lvl) {
         if (readBinary) {
-            var bufView = new Uint16Array(data);
+            var bufView = new Uint16Array(score);
             if (bufView[0] != gameInfo.score)
                 updateScore(bufView[0]);
+            bufView = new Uint16Array(level);
+            if (bufView[0] != level)
+                updateLevel(bufView[0]);
         } else {
-            if (data.score != gameInfo.score)
-                updateScore(data.score);
+            if (score != gameInfo.score)
+                updateScore(score);
+            if (lvl != level)
+                updateLevel(lvl);
         }
     });
 
@@ -136,9 +136,6 @@ $(document).ready(function () {
         if (readBinary) {
             var bufView = new Uint8Array(data);
             gameInfo.field = Array.prototype.slice.call(bufView);
-            for (i = 0; i < bufView.length; i++) {
-                console.log('[' + i + '] = ' + bufView[i]);
-            }
         } else {
             gameInfo.field = data.field;
         }
@@ -146,6 +143,7 @@ $(document).ready(function () {
         level = 1;
         gameRunning = true;
         updateScore(gameInfo.score);
+        updateLevel(level);
     });
 
     socket.on('setuser', function(data) {
@@ -216,12 +214,13 @@ function colourUsername() {
 }
 
 function updateScore(newScore) {
-    if (Math.abs(newScore - gameInfo.score) === gameInfo.field_width) {
-        level++;
-        $('#leveltext').html('Level: ' + level);
-    }
     gameInfo.score = newScore;
-    $('#scoretext').html('Score: ' + gameInfo.score);
+    $('#scoretext').text('Score: ' + gameInfo.score);
+}
+
+function updateLevel(newLevel) {
+    level = newLevel;
+    $('#leveltext').text('Level: ' + level);
 }
 
 function createLobby(lobby, fwidth, fheight, gspeed) {
@@ -252,7 +251,7 @@ function reset() {
     gameRunning = false;
     gameInfo.field = [];
     level = 1;
-    players = {};
+    players = [];
     audio.pause();
     audio.currentTime = 0;
 }
@@ -264,9 +263,8 @@ function submitmove(key) {
 
 function joinGame(lobby) {
     if (isInGame() && lobby != gameInfo.lobby) {
-        socket.emit('leave', { lobbyname: gameInfo.lobby, userid: gameInfo.userid, username: gameInfo.username });
-        reset();
-        socket.emit('join', { lobbyname: lobby, username: gameInfo.username });
+        gameInfo.field = [];
+        socket.emit('leavejoin', { oldlobby: gameInfo.lobby, userid: gameInfo.userid, newlobby: lobby, username: gameInfo.username });
     } else if (!isInGame()) {
         socket.emit('join', { lobbyname: lobby, username: gameInfo.username });
     }
@@ -1122,17 +1120,17 @@ function render() {
     }
 
     if (typeof players !== 'undefined') {
-        for (var key in players) {
-            for (d2 = 0; d2 < players[key].length; d2++) {
-                if (players[key][d2] >= 0) {
+        for (i = 0; i < players.length; i++) {
+            for (d2 = 0; d2 < players[i].length; d2++) {
+                if (players[i][d2] >= 0) {
                     // Save the current matrix, then rotate before we draw.
                     mvPushMatrix();
-                    mvTranslate([Math.floor(players[key][d2] % gameInfo.field_width) * 2 - gameInfo.field_width + 1,
-                        gameInfo.field_height - Math.floor(players[key][d2] / gameInfo.field_width) * 2 - 1, 0]);
+                    mvTranslate([Math.floor(players[i][d2] % gameInfo.field_width) * 2 - gameInfo.field_width + 1,
+                        gameInfo.field_height - Math.floor(players[i][d2] / gameInfo.field_width) * 2 - 1, 0]);
                     //mvRotate(cubeRotation, [1, 0, 1]);
 
                     // Specify the texture to map onto the faces.
-                    var id = parseInt(key);
+                    var id = i + 1;
                     if (id === 1) {
                         gl.uniform1i(gl.getUniformLocation(shaderProgram, "uSampler"), 1);
                     } else if (id === 2) {

@@ -26,14 +26,15 @@ module.exports.room = function() {
     };
 
     // Metadata
-    this.speed = 100;
+    this.speed = 1000;
     this.score = 0;
+    this.level = 1;
     this.multiplier = 1;
     this.id = 0;
     this.name = '';
     this.players = [];
     this.stones = [];
-    this.gameover = false;
+    this.gameOver = false;
     this.gameStarted = false;
     this.callback;
     this.stateChanged = false;
@@ -41,25 +42,28 @@ module.exports.room = function() {
 
     this.createRoom = function(roomName, roomID, user, width, height) {
         // Implement your game room (server side) logic here
-        if (!this.gameStarted && !this.gameover) {
+        if (!this.gameStarted && !this.gameOver) {
             this.name = roomName;
             this.field_width = width;
             this.field_height = height;
-            this.initField();
-            this.gameover = false;
-            this.gameStarted = false;
-            this.stateChanged = false;
+            this.reset();
             this.addUser(user, true);
             console.log("Created Lobby: \'" + roomName + "\'");
-            console.log("\twidth = " + this.field_width);
-            console.log("\theight = " + this.field_height);
-            console.log("\tfield = " + this.field.length);
+            console.log("\tsize = " + this.field_width + "x" + this.field_height);
             console.log("\tcreated by = " + user);
         }
     };
 
     this.setSpeed = function(speed) {
         this.speed = speed;
+        // Set score multiplier according to game speed
+        switch (this.speed) {
+            case 250: this.multiplier = 4; break;
+            case 500: this.multiplier = 3; break;
+            case 750: this.multiplier = 2; break;
+            case 1000: this.multiplier = 1; break;
+            default: this.multiplier = 1;
+        }
     }
 
     this.setGameOverCallback = function(func) {
@@ -72,7 +76,7 @@ module.exports.room = function() {
     }
 
     this.startGame = function() {
-        this.gameover = false;
+        this.gameOver = false;
         this.gameStarted = true;
         console.log("Game \"" + this.name + "\" started");
     }
@@ -83,12 +87,14 @@ module.exports.room = function() {
     }
 
     this.reset = function() {
-        this.gameover = false;
+        this.level = 1;
+        this.score = 0;
+        this.gameOver = false;
         this.gameStarted = false;
         this.stateChanged = false;
         this.players = [];
         this.stones = [];
-        this.field = [];
+        this.initField();
     }
 
     this.addUser = function(user, status=false) {
@@ -126,7 +132,9 @@ module.exports.room = function() {
                 this.players = this.players.filter(function(item) { return item.id !== userid; });
                 this.stones = this.stones.filter(function(item) { return item.color !== userid; });
             }
-
+            // Reset game when there is no player left
+            if (this.players.length === 0)
+                this.reset();
         }
     }
 
@@ -153,7 +161,7 @@ module.exports.room = function() {
                 if (this.field[i * this.field_width + j] > 0) {
                     full++;
                     if (full === this.field_width) {
-                        this.score += this.field_width * this.multiplier;
+                        this.updateScoreLevel();
                         for (k = 0; k < i; k++) {
                             for (l = 0; l < this.field_width; l++) {
                                 this.field[(i - k) * this.field_width + l] = this.field[(i - k - 1) * this.field_width + l];
@@ -171,6 +179,11 @@ module.exports.room = function() {
         }
 
         this.spawnStone(userid);
+    }
+
+    this.updateScoreLevel = function() {
+        this.score += this.field_width * this.multiplier;
+        this.level++;
     }
 
     this.playerStoneAt = function(index) {
@@ -437,9 +450,9 @@ module.exports.room = function() {
     }
 
     this.gamelogic = function() {
-        if (!this.gameover) {
+        if (!this.gameOver) {
             // Check if the player's stones reached the bottom
-            for (j = 0; j < this.stones.length && !this.isGameOver(); j++) {
+            for (j = 0; j < this.stones.length && !this.isgameOver(); j++) {
                 for (i = 0; i < 4 && this.stones[j].pos[i] !== -1; i++) {
                     // Check if the player's stone is in the last row or one before that and there
                     // is no free space under his stone
@@ -455,11 +468,11 @@ module.exports.room = function() {
         }
     }
 
-    this.isGameOver = function() {
+    this.isgameOver = function() {
         // Check if stones are so high the game is over
         for (i = 0; i < this.field_width; i++) {
             if (this.field[i] > 0) {
-                this.gameover = true;
+                this.gameOver = true;
                 this.gameStarted = false;
                 this.callGameOverCallback();
                 return true;
@@ -469,7 +482,7 @@ module.exports.room = function() {
     }
 
     this.dropStones = function() {
-        if (!this.gameover) {
+        if (!this.gameOver) {
             for (j = 0; j < this.stones.length; j++) {
                 var setzen = true;
                 for (i = 0; i < 4 && this.stones[j].pos[i] !== -1; i++) {

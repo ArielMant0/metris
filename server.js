@@ -164,7 +164,7 @@ function setEventHandlers() {
             if (roomlist.has(data.lobbyname)) {
                 game = roomlist.get(data.lobbyname);
                 socket.emit('moveField', sendFieldData(game.field));
-                socket.emit('moveScore', sendScoreData(game.score));
+                socket.emit('moveScore', sendScoreData(game.score), sendLevelData(game.level));
             }
         });
 
@@ -216,12 +216,30 @@ function setEventHandlers() {
             }
         });
 
+        socket.on('leavejoin', function(data) {
+            if (roomlist.has(data.oldlobby) && roomlist.has(data.newlobby)) {
+                oldgame = roomlist.get(data.oldlobby);
+                newgame = roomlist.get(data.newlobby);
+                oldgame.removeUser(data.userid);
+                newgame.addUser(data.username);
+
+                // Tell the player its game info
+                socket.emit('setgameinfo', { lobbyname: newgame.name, id: newgame.getLastUser(),
+                        width: newgame.field_width, height: newgame.field_height, username: data.username });
+                // If the game already started tell the player about it
+                if (newgame.gameStarted && !newgame.gameOver)
+                    socket.emit('begin', sendFieldData(newgame.field));
+
+                socket.emit('showGame');
+            }
+        });
+
         socket.on('leave', function(data) {
             if (roomlist.has(data.lobbyname)) {
                 game = roomlist.get(data.lobbyname);
-                if (game.players.length >= data.userid && game.players[data.userid].name === data.username) {
+                if (game.players[data.userid].name === data.username) {
                     game.removeUser(data.userid);
-                    if (game.gameStarted && !game.gameover)
+                    if (game.gameStarted && !game.gameOver)
                         io.sockets.in(game.name).emit('movePlayers', sendPlayerData(game.players));
                 }
             }
@@ -238,20 +256,19 @@ function setEventHandlers() {
                     socket.emit('setgameinfo', { lobbyname: game.name, id: game.getLastUser(),
                         width: game.field_width, height: game.field_height, username: data.username });
                     // If the game already started tell the player about it
-                    if (game.gameStarted && !game.gameover)
+                    if (game.gameStarted && !game.gameOver)
                         socket.emit('begin', sendFieldData(game.field));
                 });
             } else if (roomlist.has(data.lobbyname) && userInGame(data.lobbyname, data.username)) {
                 game = roomlist.get(data.lobbyname);
-                if (game.gameStarted) {
-                    socket.emit('showGame');
-                } else {
+                if (!game.gameStarted) {
                     game.startGame();
-                    game.setGameOverCallback(endGame);
 
                     // Start game loops for this game
                     setLoops(game);
                     socket.emit('begin', sendFieldData(game.field));
+                } else {
+                    socket.emit('showGame');
                 }
             }
         });
@@ -318,9 +335,9 @@ function setLoops(game) {
             game.gamelogic();
             if (game.stateChanged) {
                 io.sockets.in(game.name).emit('moveField', sendFieldData(game.field));
-                io.sockets.in(game.name).emit('moveScore', sendScoreData(game.score));
+                io.sockets.in(game.name).emit('moveScore', sendScoreData(game.score), sendLevelData(game.level));
             }
-        }, 100);
+        }, 50);
 
         // Store IDs so we can stop intervals once the game is over
         loops.set(game.name, { long: l, short: s });
@@ -328,30 +345,37 @@ function setLoops(game) {
 }
 
 function sendFieldData(field) {
-    var data = OptimizeField(field);
+    //var field = OptimizeField(data);
     if (useBinary)
-        return sendBinaryField(data);
+        return sendBinaryField(field);
     else
-        return { field: data };
+        return field;
 }
 
 function sendPlayerData(stones) {
     if (useBinary) {
         return sendBinaryPlayers(stones);
     } else {
-        var json = {};
+        var list = [stones.length];
         stones.forEach(function(item, index, array) {
-            json[(index+1).toString()] = item.pos;
+            list[index] = item.pos;
         });
-        return json;
+        return list;
     }
 }
 
-function sendScoreData(points) {
+function sendScoreData(score) {
     if (useBinary)
-        return sendBinaryScore(points);
+        return sendBinaryScore(score);
     else
-        return { score: points };
+        return score;
+}
+
+function sendLevelData(level) {
+    if (useBinary)
+        return sendBinaryScore(level);
+    else
+        return level;
 }
 
 function sendBinaryField(field) {
@@ -364,9 +388,11 @@ function sendBinaryField(field) {
 }
 
 function sendBinaryPlayers(players) {
-    var bufArr = new ArrayBuffer(2);
-    var bufView = new Uint16Array(bufArr);
-    bufView[0] = score;
+    var bufArr = new ArrayBuffer(players.length);
+    var bufView = new Uint8Array(bufArr);
+    for(i = 0; i < players.length; i++) {
+        bufView[i] = players[i].pos;
+    }
     return bufArr;
 }
 
@@ -388,6 +414,7 @@ function createDefaultGame(name, w, h, s) {
     game = roomlist.get(name);
     game.createRoom(name, generateRoomID(), 'Admin', w, h);
     game.setSpeed(s);
+    game.setGameOverCallback(endGame);
     game.removeUser(game.getLastUser());
 }
 
