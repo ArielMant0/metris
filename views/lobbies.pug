@@ -20,16 +20,12 @@ div(class='modal', id='create-modal')
                 option 20
                 option 40
                 option 60
-        span(class='create-entry')
-            label(for='game-speed') Stone Speed
-            select(id='game-speed')
-                option 1000
-                option 750
-                option 500
-                option 250
         button(type='submit', id='submit-lobby') Create
+
 
 ul(class='lobby-list')
     each lobby in lobbies
         li(class='lobby-entry', id=lobby.name) #{lobby.name}
-            button(class='lobby-button', id=lobby.name+'-button') Join
+            div(id='lobb-button-container')
+                button(class='lobby-button', id=lobby.name+'-join') Join
+                button(class='watch-button', id=lobby.name+'-watch') Watch

@@ -59,6 +59,12 @@ app.get(/\/game\/[a-zA-z0-9]/, function (req, res) {
     res.render('game');
 });
 
+// Controls
+app.get('/controls', function (req, res) {
+    // Render error.pug
+    res.render('controls');
+});
+
 // Errors
 app.get('/error', function (req, res) {
     // Render error.pug
@@ -150,6 +156,7 @@ function setEventHandlers() {
                 game = roomlist.get(data.lobbyname);
                 game.startGame();
                 game.setGameOverCallback(endGame);
+                game.setSpeedCallback(updateSpeed);
 
                 // Start game loops for this game
                 setLoops(game);
@@ -185,7 +192,7 @@ function setEventHandlers() {
                     game = roomlist.get(data.lobbyname);
                     game.createRoom(data.lobbyname, generateRoomID(), data.username,
                         data.width, data.height);
-                    game.setSpeed(data.speed);
+                    users.set(data.username, game.name);
 
                     // Tell socket game info
                     socket.emit('setgameinfo', { lobbyname: game.name, id: game.getLastUser(),
@@ -200,7 +207,7 @@ function setEventHandlers() {
         socket.on('login', function(data) {
             if (!users.has(data.username)) {
                 users.set(data.username, '');
-                socket.emit('setuser', { name: data.username });
+                socket.emit('loggedin', data.username);
                 console.log("Player \'" + data.username + "\' logged in");
             } else {
                 setLastError(1, data.username);
@@ -211,7 +218,7 @@ function setEventHandlers() {
         socket.on('logout', function(data) {
             if (users.has(data.username)) {
                 users.delete(data.username);
-                socket.emit('setuser', { name: '' });
+                socket.emit('loggedout');
                 console.log("Player \'" + data.username + "\' logged out");
             }
         });
@@ -221,26 +228,31 @@ function setEventHandlers() {
                 oldgame = roomlist.get(data.oldlobby);
                 newgame = roomlist.get(data.newlobby);
                 oldgame.removeUser(data.userid);
-                newgame.addUser(data.username);
+                if (newgame.addUser(data.username)) {
+                    users.set(data.username, newgame.name);
+                    // Tell the player its game info
+                    socket.emit('setgameinfo', { lobbyname: newgame.name, id: newgame.getLastUser(),
+                            width: newgame.field_width, height: newgame.field_height, username: data.username });
+                    // If the game already started tell the player about it
+                    if (newgame.gameStarted && !newgame.gameOver)
+                        socket.emit('begin', sendFieldData(newgame.field));
 
-                // Tell the player its game info
-                socket.emit('setgameinfo', { lobbyname: newgame.name, id: newgame.getLastUser(),
-                        width: newgame.field_width, height: newgame.field_height, username: data.username });
-                // If the game already started tell the player about it
-                if (newgame.gameStarted && !newgame.gameOver)
-                    socket.emit('begin', sendFieldData(newgame.field));
-
-                socket.emit('showGame');
+                    socket.emit('showGame');
+                } else {
+                    users.set(data.username, '');
+                }
             }
         });
 
-        socket.on('leave', function(data) {
-            if (roomlist.has(data.lobbyname)) {
-                game = roomlist.get(data.lobbyname);
-                if (game.players[data.userid].name === data.username) {
-                    game.removeUser(data.userid);
-                    if (game.gameStarted && !game.gameOver)
-                        io.sockets.in(game.name).emit('movePlayers', sendPlayerData(game.players));
+        socket.on('leave', function(lobby, id, user) {
+            console.log(lobby + id  + user);
+            if (roomlist.has(lobby) && users.has(user)) {
+                game = roomlist.get(lobby);
+                if (game.players[id].name === user) {
+                    game.removeUser(id);
+                    users.set(user, '');
+                    checkDelete(lobby);
+                    socket.emit('leftgame');
                 }
             }
         });
@@ -250,14 +262,14 @@ function setEventHandlers() {
             if (roomlist.has(data.lobbyname) && !userInGame(data.lobbyname, data.username)) {
                 socket.join(data.lobbyname, function() {
                     game = roomlist.get(data.lobbyname);
-                    game.addUser(data.username);
-
-                    // Tell the player its game info
-                    socket.emit('setgameinfo', { lobbyname: game.name, id: game.getLastUser(),
-                        width: game.field_width, height: game.field_height, username: data.username });
-                    // If the game already started tell the player about it
-                    if (game.gameStarted && !game.gameOver)
-                        socket.emit('begin', sendFieldData(game.field));
+                    if (game.addUser(data.username)) {
+                        // Tell the player its game info
+                        socket.emit('setgameinfo', { lobbyname: game.name, id: game.getLastUser(),
+                            width: game.field_width, height: game.field_height, username: data.username });
+                        // If the game already started tell the player about it
+                        if (game.gameStarted && !game.gameOver)
+                            socket.emit('begin', sendFieldData(game.field));
+                    }
                 });
             } else if (roomlist.has(data.lobbyname) && userInGame(data.lobbyname, data.username)) {
                 game = roomlist.get(data.lobbyname);
@@ -280,6 +292,18 @@ function setEventHandlers() {
                     endGame(game.name, game.players, game.score);
             }
         });
+
+        socket.on('spectate', function(lobbyname) {
+            if (roomlist.has(lobbyname)) {
+                socket.join(lobbyname, function() {
+                    game = roomlist.get(lobbyname);
+                    // Tell the player its game info
+                    socket.emit('setspecinfo', game.name, game.field_width, game.field_height);
+                    // If the game already started tell the player about it
+                    socket.emit('begin', sendFieldData(game.field));
+                });
+            }
+        });
     });
 }
 
@@ -296,6 +320,11 @@ function userInGame(lobby, name) {
     return roomlist.get(lobby).players.some(function(element, index, array) {
         return element.name === name;
     });
+}
+
+function checkDelete(lobby) {
+    if (lobby !== def1 && lobby !== def2 && roomlist.get(lobby).players.length === 0)
+        roomlist.delete(lobby);
 }
 
 function endGame(lobby, players, score) {
@@ -321,27 +350,35 @@ function endGame(lobby, players, score) {
     }
 }
 
+function updateSpeed(game) {
+    if (loops.has(game.name)) {
+        console.log("Updating speed in lobby: " + game.name);
+        clearInterval(loops.get(game.name).short);
+        clearInterval(loops.get(game.name).long);
+
+        setLoops(game);
+    }
+}
+
 // Start game loops
 function setLoops(game) {
 
-    if (!loops.has(game.name)) {
-        var l = setInterval(function() {
-            game.dropStones();
-            io.sockets.in(game.name).emit('movePlayers', sendPlayerData(game.stones));
-        }, game.speed);
+    var l = setInterval(function() {
+        game.dropStones();
+        io.sockets.in(game.name).emit('movePlayers', sendPlayerData(game.stones));
+    }, game.speed);
 
-        var s = setInterval(function () {
-            game.stateChanged = false;
-            game.gamelogic();
-            if (game.stateChanged) {
-                io.sockets.in(game.name).emit('moveField', sendFieldData(game.field));
-                io.sockets.in(game.name).emit('moveScore', sendScoreData(game.score), sendLevelData(game.level));
-            }
-        }, 50);
+    var s = setInterval(function () {
+        game.stateChanged = false;
+        game.gamelogic();
+        if (game.stateChanged) {
+            io.sockets.in(game.name).emit('moveField', sendFieldData(game.field));
+            io.sockets.in(game.name).emit('moveScore', sendScoreData(game.score), sendLevelData(game.level));
+        }
+    }, 50);
 
-        // Store IDs so we can stop intervals once the game is over
-        loops.set(game.name, { long: l, short: s });
-    }
+    // Store IDs so we can stop intervals once the game is over
+    loops.set(game.name, { long: l, short: s });
 }
 
 function sendFieldData(field) {
@@ -408,13 +445,13 @@ function OptimizeField(field) {
     return field;
 }
 
-function createDefaultGame(name, w, h, s) {
+function createDefaultGame(name, w, h) {
     // Just for Testing
     roomlist.set(name, new lobby.room());
     game = roomlist.get(name);
     game.createRoom(name, generateRoomID(), 'Admin', w, h);
-    game.setSpeed(s);
     game.setGameOverCallback(endGame);
+    game.setSpeedCallback(updateSpeed);
     game.removeUser(game.getLastUser());
 }
 
@@ -453,5 +490,5 @@ updateHighscores();
 // Set all event handlers
 setEventHandlers();
 
-createDefaultGame(def1, 60, 30, 500);
-createDefaultGame(def2, 30, 16, 750);
+createDefaultGame(def1, 60, 30);
+createDefaultGame(def2, 30, 16);

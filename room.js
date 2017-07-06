@@ -54,16 +54,30 @@ module.exports.room = function() {
         }
     };
 
-    this.setSpeed = function(speed) {
-        this.speed = speed;
-        // Set score multiplier according to game speed
-        switch (this.speed) {
-            case 250: this.multiplier = 4; break;
-            case 500: this.multiplier = 3; break;
-            case 750: this.multiplier = 2; break;
-            case 1000: this.multiplier = 1; break;
-            default: this.multiplier = 1;
+    this.initSpeed = function() {
+        this.speed = 1000;
+        this.multiplier = 1;
+    }
+
+    this.setSpeed = function() {
+        if (this.speed > 250) {
+            this.speed -= 250;
+            this.multiplier++;
+        } else {
+            var newSpeed = this.speed - this.speed * (1 / 3) > 25 ? this.speed - this.speed * (1 / 3) : 25;
+            if (newSpeed != this.speed)
+                this.multiplier++;
+            this.speed = newSpeed;
         }
+    }
+
+    this.setSpeedCallback = function(func) {
+        this.speedUpdate = func;
+    }
+
+    this.callSpeedCallback = function() {
+        if (this.speedUpdate)
+            this.speedUpdate(this);
     }
 
     this.setGameOverCallback = function(func) {
@@ -95,6 +109,7 @@ module.exports.room = function() {
         this.players = [];
         this.stones = [];
         this.initField();
+        this.initSpeed();
     }
 
     this.addUser = function(user, status=false) {
@@ -103,7 +118,10 @@ module.exports.room = function() {
             this.players.push(new this.player(this.players.length, user, status));
             this.stones.push(new this.stone(this.players.length));
             this.spawnStone(this.stones.length-1);
+
+            return true;
         }
+        return false;
     }
 
     this.isAdmin = function(userid) {
@@ -167,6 +185,7 @@ module.exports.room = function() {
                                 this.field[(i - k) * this.field_width + l] = this.field[(i - k - 1) * this.field_width + l];
                             }
                         }
+                        i++;
                     }
                 } else {
                     empty++;
@@ -184,25 +203,8 @@ module.exports.room = function() {
     this.updateScoreLevel = function() {
         this.score += this.field_width * this.multiplier;
         this.level++;
-    }
-
-    this.playerStoneAt = function(index) {
-        for (i = 0; i < this.stones.length; i++) {
-            if (index === this.stones[i].pos[0] || index === this.stones[i].pos[1] ||
-                index === this.stones[i].pos[2] || index === this.stones[i].pos[3]) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    this.getPlayerAt = function(index) {
-        return this.stones.find(function(item, at, array) {
-            return this === item.pos[0] ||
-                   this === item.pos[1] ||
-                   this === item.pos[2] ||
-                   this === item.pos[3];
-        }, index);
+        this.setSpeed();
+        this.callSpeedCallback();
     }
 
     this.setStaticStone = function(userid) {
@@ -210,10 +212,6 @@ module.exports.room = function() {
             this.field[this.stones[userid].pos[i]] = userid + 1;
         }
         this.stateChanged = true;
-    }
-
-    this.notPlayerStone = function(index) {
-        return !this.playerStoneAt;
     }
 
     this.spawnStone = function(userid) {
@@ -238,27 +236,28 @@ module.exports.room = function() {
                 this.stones[userid].pos = [(this.field_width / 2) - 1 + at, (this.field_width / 2) + at, (this.field_width / 2) + 1 + at, -1];
                 break;
             case 3:
-                this.stones[userid].pos = [(this.field_width / 2) - 1 + at, (this.field_width / 2) + at, (this.field_width / 2) + 1 + at, (this.field_width / 2) + 2 + at]
+                this.stones[userid].pos = [(this.field_width / 2) - 1 + at, (this.field_width / 2) + at, (this.field_width / 2) + 1 + at, (this.field_width / 2) + 2 + at];
                 break;
             case 4:
-                this.stones[userid].pos = [(this.field_width / 2) - 1 + at, this.field_width / 2 + at, this.field_width / 2 + 1 + at, this.field_width / 2 + this.field_width + at]
+                this.stones[userid].pos = [(this.field_width / 2) - 1 + at, this.field_width / 2 + at, this.field_width / 2 + 1 + at, this.field_width / 2 + this.field_width + at];
                 break;
             case 5:
-                this.stones[userid].pos = [(this.field_width / 2) - 1 + at, this.field_width / 2 + at, this.field_width / 2 - 1 + this.field_width + at, this.field_width / 2 + this.field_width + at]
+                this.stones[userid].pos = [(this.field_width / 2) - 1 + at, this.field_width / 2 + at, this.field_width / 2 - 1 + this.field_width + at, this.field_width / 2 + this.field_width + at];
                 break;
             case 6:
-                this.stones[userid].pos = [(this.field_width / 2) - 1 + at, this.field_width / 2 - 1 + this.field_width + at, this.field_width / 2 + this.field_width + at, this.field_width / 2 + 1 + this.field_width + at]
+                this.stones[userid].pos = [(this.field_width / 2) - 1 + at, this.field_width / 2 - 1 + this.field_width + at, this.field_width / 2 + this.field_width + at, this.field_width / 2 + 1 + this.field_width + at];
                 break;
             case 7:
-                this.stones[userid].pos = [(this.field_width / 2) - 1 + at, this.field_width / 2 + at, this.field_width / 2 + 1 + at, this.field_width / 2 - 1 + this.field_width + at]
+                this.stones[userid].pos = [(this.field_width / 2) - 1 + at, this.field_width / 2 + at, this.field_width / 2 + 1 + at, this.field_width / 2 - 1 + this.field_width + at];
                 break;
             case 8:
-                this.stones[userid].pos = [(this.field_width / 2) - 1 + at, this.field_width / 2 + at, this.field_width / 2 - 1 + this.field_width + at, -1]
+                this.stones[userid].pos = [(this.field_width / 2) - 1 + at, this.field_width / 2 + at, this.field_width / 2 - 1 + this.field_width + at, -1];
+                break;
             case 9:
-                this.stones[userid].pos = [(this.field_width / 2) + at, (this.field_width / 2) + 1 + at, this.field_width / 2 - 1 + this.field_width + at, this.field_width / 2 + this.field_width + at]
+                this.stones[userid].pos = [(this.field_width / 2) + at, (this.field_width / 2) + 1 + at, this.field_width / 2 - 1 + this.field_width + at, this.field_width / 2 + this.field_width + at];
                 break;
             case 10:
-                this.stones[userid].pos = [(this.field_width / 2) - 1 + at, (this.field_width / 2) + at, this.field_width / 2 + this.field_width + at, this.field_width / 2 + 1 + this.field_width + at]
+                this.stones[userid].pos = [(this.field_width / 2) - 1 + at, (this.field_width / 2) + at, this.field_width / 2 + this.field_width + at, this.field_width / 2 + 1 + this.field_width + at];
                 break;
         }
     }

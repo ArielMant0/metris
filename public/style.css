@@ -18,6 +18,14 @@ footer p {
     margin: 10px;
 }
 
+#controls {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    align-content: center;
+    margin-top: 10%;
+}
+
 #game-over {
     display: none;
     position: absolute;
@@ -131,9 +139,14 @@ footer p {
     list-style: none;
 }
 
+#score-container {
+    display: flex;
+    justify-content: center;
+    overflow: auto;
+}
+
 .score-list {
-    margin: 0;
-    padding-top: 10px;
+    margin-top: 50px;
     color: black;
 }
 
@@ -166,23 +179,32 @@ footer p {
     background-color: #171717;
 }
 
-.lobby-button {
-    border-radius: 50%;
-    width: 40px;
+.lobby-button, .watch-button {
+    border-radius: 10%;
+    width: 100px;
     height: 40px;
     border: 1px solid #6794A5;
     background-color: #82BCD1;
+    margin: 5px;
 }
 
-.lobby-button:hover {
+.lobby-button:hover, .watch-button:hover {
     background-color: #6794A5;
 }
 
 .joined {
-    background-color: #429B22;
+    background-color: #A90D02;
 }
 
 .joined:hover {
+    background-color: #C02C21;
+}
+
+.nonspec {
+    background-color: #429B22;
+}
+
+.nonspec:hover {
     background-color: #52BF2A;
 }
 

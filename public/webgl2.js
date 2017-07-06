@@ -70,12 +70,19 @@ var gameInfo = {
     score: 0
 };
 
+var playerColor = {
+    r: 255,
+    g: 255,
+    b: 255
+};
+
 var audio;
 var socket;
 
 var level = 1;
 var readBinary = false;
 var gameRunning = false;
+var spectator = false;
 
 $(document).ready(function () {
     // WebSocket
@@ -132,12 +139,12 @@ $(document).ready(function () {
         }
     });
 
-    socket.on('begin', function (data) {
+    socket.on('begin', function (field) {
         if (readBinary) {
             var bufView = new Uint8Array(data);
             gameInfo.field = Array.prototype.slice.call(bufView);
         } else {
-            gameInfo.field = data.field;
+            gameInfo.field = field;
         }
         gameInfo.score = 0;
         level = 1;
@@ -146,8 +153,17 @@ $(document).ready(function () {
         updateLevel(level);
     });
 
-    socket.on('setuser', function(data) {
-        gameInfo.username = data.name;
+    socket.on('leftgame', function() {
+        reset();
+    });
+
+    socket.on('loggedout', function() {
+        reset();
+        gameInfo.username = '';
+    })
+
+    socket.on('loggedin', function(name) {
+        gameInfo.username = name;
     })
 
     socket.on('gameover', function() {
@@ -160,6 +176,13 @@ $(document).ready(function () {
         sendAjax('get', '/error', '#content');
     });
 
+    socket.on('setspecinfo', function(lobbyname, width, height) {
+        gameInfo.lobby = lobbyname;
+        gameInfo.field_width = width;
+        gameInfo.field_height = height;
+        spectator = true;
+    });
+
     socket.on('setgameinfo', function(data) {
         gameInfo.lobby = data.lobbyname;
         gameInfo.userid = data.id;
@@ -167,6 +190,7 @@ $(document).ready(function () {
         gameInfo.field_height = data.height;
         gameInfo.username = data.username;
         colourUsername();
+        spectator = false;
     });
 
     $('#get-lobbies').on('click', function () {
@@ -179,38 +203,38 @@ $(document).ready(function () {
 
     $(document).keydown(function (e) {
         // A, E, Q, D, S
-        if (gameRunning && (e.which == 65 || e.which == 69 || e.which == 81 || e.which == 68 || e.which == 83)) {
+        if (!spectator && gameRunning && (e.which == 65 || e.which == 69 || e.which == 81 || e.which == 68 || e.which == 83))
             submitmove(e.which, gameInfo.userid);
-        } else if (gameRunning && e.which == 27) {
+        else if (gameRunning && e.which == 27)
             closeLobby();
-        } else if (gameRunning && e.which == 49) {
-            level = 1;
-            resetBuffer();
-        } else if (gameRunning && e.which == 50) {
-            level = 2;
-            resetBuffer();
-        } else if (gameRunning && e.which == 51) {
-            level = 3;
-            resetBuffer();
-        } else if (gameRunning && e.which == 52) {
-            level = 4;
-            resetBuffer();
-        }
     });
 });
+
+function watchAsSpectator(lobbyname) {
+    socket.emit('spectate', lobbyname);
+}
 
 function closeLobby() {
     socket.emit('endGame', { lobbyname: gameInfo.lobby, userid: gameInfo.userid });
 }
 
 function colourUsername() {
-    switch (gameInfo.userid) {
-        case 0: $('#player-name').css('color', 'green'); break;
-        case 1: $('#player-name').css('color', 'red'); break;
-        case 2: $('#player-name').css('color', 'blue'); break;
-        case 3: $('#player-name').css('color', 'yellow'); break;
-        default: break;
-    }
+    var hash = djb2(gameInfo.username);
+    playerColor.r = (hash & 0xFF0000) >> 16;
+    playerColor.g = (hash & 0x00FF00) >> 8;
+    playerColor.b = hash & 0x0000FF;
+
+    $('#player-name').css('color', "rgb(" + playerColor.r + ","
+                                          + playerColor.g + ","
+                                          + playerColor.b + ")");
+}
+
+function djb2(str){
+  var hash = 5381;
+  for (var i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash) + str.charCodeAt(i); /* hash * 33 + c */
+  }
+  return hash;
 }
 
 function updateScore(newScore) {
@@ -223,10 +247,10 @@ function updateLevel(newLevel) {
     $('#leveltext').text('Level: ' + level);
 }
 
-function createLobby(lobby, fwidth, fheight, gspeed) {
+function createLobby(lobby, fwidth, fheight) {
     if (gameInfo.username)
         socket.emit('createlobby', { lobbyname: lobby, username: gameInfo.username,
-                                     width: fwidth, height: fheight, speed: gspeed });
+                                     width: fwidth, height: fheight });
 }
 
 function setPlayerName(name) {
@@ -238,13 +262,13 @@ function isLoggedIn() {
 }
 
 function isInGame() {
-    return gameInfo.lobby !== '';
+    return !spectator && gameInfo.lobby !== '';
 }
 
 function reset() {
     $('#player-name').css('color', 'white');
     gameInfo.lobby = '';
-    gameInfo.userid = 0;
+    gameInfo.userid = -1;
     gameInfo.field_width = 0;
     gameInfo.field_height = 0;
     gameInfo.score = 0;
@@ -254,6 +278,7 @@ function reset() {
     players = [];
     audio.pause();
     audio.currentTime = 0;
+    spectator = false;
 }
 
 // Send player movement
@@ -262,6 +287,7 @@ function submitmove(key) {
 }
 
 function joinGame(lobby) {
+    spectator = false;
     if (isInGame() && lobby != gameInfo.lobby) {
         gameInfo.field = [];
         socket.emit('leavejoin', { oldlobby: gameInfo.lobby, userid: gameInfo.userid, newlobby: lobby, username: gameInfo.username });
@@ -270,11 +296,16 @@ function joinGame(lobby) {
     }
 }
 
+function leaveGame(lobby) {
+    socket.emit('leave', gameInfo.lobby, gameInfo.userid, gameInfo.username);
+}
+
 function sendLogin(name) {
     socket.emit('login', { username: name });
 }
 
 function sendLogout() {
+    spectator = false;
     socket.emit('logout', { username: gameInfo.username });
 }
 

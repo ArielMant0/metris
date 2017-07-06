@@ -33,6 +33,14 @@ function sendAjaxListeners(method, url, elem, func) {
 function initLobbyListeners() {
 	$('#content').innerHeight($('body').innerHeight() - $('footer').outerHeight() - $('#topnav').outerHeight());
 
+	$('.watch-button').each(function() {
+		$(this).on('click', function () {
+			var lobbyname = $(this).attr('id').split('-')[0];
+			watchAsSpectator(lobbyname);
+			loadGame({ data: { gameID: lobbyname }});
+		});
+	});
+
 	if (isLoggedIn()) {
 		$('.lobby-button').each(function() {
 			$(this).on('click', function () {
@@ -43,8 +51,19 @@ function initLobbyListeners() {
 		});
 
 		if (isInGame()) {
-			$('#'+gameInfo.lobby + '-button').text('Start');
-			$('#'+gameInfo.lobby + '-button').addClass('joined');
+			$('#'+gameInfo.lobby + '-join').text('Leave');
+			$('#'+gameInfo.lobby + '-join').addClass('joined');
+			$('#'+gameInfo.lobby + '-join').off();
+			$('#'+gameInfo.lobby + '-join').on('click', function() {
+				leaveGame();
+				loadLobbies();
+			});
+
+			$('#'+gameInfo.lobby + '-watch').text('Go');
+			$('#'+gameInfo.lobby + '-watch').addClass('nonspec');
+			$('#'+gameInfo.lobby + '-watch').off();
+			$('#'+gameInfo.lobby + '-watch').on('click', { gameID: gameInfo.lobby }, loadGame);
+
 		}
 
 		$('#create-lobby').on('click', function() {
@@ -55,9 +74,9 @@ function initLobbyListeners() {
 		$('#login-button').text('Logout');
 		$('#login-button').on('click', function() {
     		logout();
+    		loadLobbies();
     	});
-	}
-	else {
+	} else {
 		$('.lobby-button').each(function() {
 			$(this).on('click', joinForm);
 			$(this).removeClass('joined');
@@ -76,8 +95,7 @@ function initLobbyListeners() {
 	});
 
 	$('#submit-lobby').on('click', function() {
-		createLobby($('#lobby-name').val(), parseInt($('#field-width').val()),
-					parseInt($('#field-height').val()), parseInt($('#game-speed').val()));
+		createLobby($('#lobby-name').val(), parseInt($('#field-width').val()), parseInt($('#field-height').val()));
 		$('#create-modal').css('display', 'none');
 		sendAjaxListeners('get', '/lobbies', '#content', initLobbyListeners);
 	});
@@ -100,22 +118,19 @@ function login(name) {
 }
 
 function loadLobbies(event) {
-	if ($(this).attr('class') !== 'active') {
-		sendAjaxListeners('get', '/lobbies', '#content', initLobbyListeners);
-	}
+	sendAjaxListeners('get', '/lobbies', '#content', initLobbyListeners);
 }
 
 function loadHighscores(event) {
-	if ($(this).attr('class') !== 'active') {
-		sendAjax('get', '/highscores', '#content');
-	}
+	sendAjax('get', '/highscores', '#content');
 }
 
-// To be called when an identified user joins a game
+function loadControls(event) {
+	sendAjax('get', '/controls', '#content');
+}
+
 function loadGame(event) {
-	if ($(this).attr('class') !== 'active') {
-		sendAjaxListeners('get', '/game/' + event.data.gameID, '#content', startgame);
-	}
+	sendAjaxListeners('get', '/game/' + event.data.gameID, '#content', startgame);
 }
 
 function lobbyForm(event) {
@@ -136,6 +151,7 @@ function setEventListeners() {
 	    $(this).addClass('active');
     	$('#get-scores').removeClass('class');
     	$('#get-game').removeClass('class');
+    	$('#get-controls').removeClass('class');
     	loadLobbies();
     });
 
@@ -143,7 +159,16 @@ function setEventListeners() {
 	    $(this).addClass('active');
     	$('#get-lobbies').removeClass('class');
     	$('#get-game').removeClass('class');
+    	$('#get-controls').removeClass('class');
     	loadHighscores();
+    });
+
+    $('#get-controls').on('click', function() {
+	    $(this).addClass('active');
+    	$('#get-lobbies').removeClass('class');
+    	$('#get-game').removeClass('class');
+    	$('#get-scores').removeClass('class');
+    	loadControls();
     });
 
     $('#get-game').on('click', function() {
@@ -151,6 +176,7 @@ function setEventListeners() {
 	    	$(this).addClass('active');
 	    	$('#get-scores').removeClass('class');
 	    	$('#get-lobbies').removeClass('class');
+	    	$('#get-controls').removeClass('class');
 	    	loadGame({ data: { gameID: gameInfo.lobby }});
 	    } else {
 	    	alert("You need to be logged in and inside a lobby to play!");
