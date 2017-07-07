@@ -1,5 +1,13 @@
 var PLAYER_OFFSET = 4;
 
+var dbj2 = function(str) {
+    var hash = 5381;
+    for (var i = 0; i < str.length; i++) {
+        hash = ((hash << 5) + hash) + str.charCodeAt(i);
+    }
+    return hash;
+}
+
 module.exports.room = function() {
 
     // Field data
@@ -23,6 +31,7 @@ module.exports.room = function() {
         this.id = userid;
         this.name = name;
         this.isAdmin = status;
+        this.hash = dbj2(name);
     };
 
     // Metadata
@@ -32,15 +41,21 @@ module.exports.room = function() {
     this.multiplier = 1;
     this.id = 0;
     this.name = '';
+    // Players and stones
     this.players = [];
     this.stones = [];
+    // Game flags
     this.gameOver = false;
     this.gameStarted = false;
-    this.callback;
     this.stateChanged = false;
+    // Callbacks
+    this.callback;
+    this.speedUpdate;
+    // Player count stuff
+    this.fixed = false;
     this.maxPlayers = 4;
 
-    this.createRoom = function(roomName, roomID, user, width, height) {
+    this.createRoom = function(roomName, roomID, user, width, height, fixed, max) {
         // Implement your game room (server side) logic here
         if (!this.gameStarted && !this.gameOver) {
             this.name = roomName;
@@ -48,6 +63,8 @@ module.exports.room = function() {
             this.field_height = height;
             this.reset();
             this.addUser(user, true);
+            this.maxPlayers = max > 0 ? max : 4;
+            this.fixed = fixed;
             console.log("Created Lobby: \'" + roomName + "\'");
             console.log("\tsize = " + this.field_width + "x" + this.field_height);
             console.log("\tcreated by = " + user);
@@ -110,6 +127,12 @@ module.exports.room = function() {
         this.stones = [];
         this.initField();
         this.initSpeed();
+        this.setMaxPlayers();
+    }
+
+    this.setMaxPlayers = function() {
+        if (!this.fixed)
+            this.maxPlayers = Math.floor((this.field_width - 1) / (PLAYER_OFFSET + 1));
     }
 
     this.addUser = function(user, status=false) {
@@ -120,8 +143,18 @@ module.exports.room = function() {
             this.spawnStone(this.stones.length-1);
 
             return true;
+        } else {
+            // TODO resize field according to player count
         }
         return false;
+    }
+
+    this.getAllHashes = function() {
+        list = [];
+        for (i = 0; i < this.players.length; i++) {
+            list.push(this.players[i].hash);
+        }
+        return list;
     }
 
     this.isAdmin = function(userid) {

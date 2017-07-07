@@ -148,6 +148,13 @@ footer p {
 .score-list {
     margin-top: 50px;
     color: black;
+    width: 100%;
+}
+
+.score-entry {
+    margin-right: 0;
+    display: flex;
+    justify-content: space-between;
 }
 
 .score-entry > span {
@@ -193,19 +200,19 @@ footer p {
 }
 
 .joined {
-    background-color: #A90D02;
+    background-color: #DB4237;
 }
 
 .joined:hover {
-    background-color: #C02C21;
+    background-color: #A90D02;
 }
 
 .nonspec {
-    background-color: #429B22;
+    background-color: #65CE3F;
 }
 
 .nonspec:hover {
-    background-color: #52BF2A;
+    background-color: #429B22;
 }
 
 .lobby-entry {

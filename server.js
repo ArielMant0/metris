@@ -194,9 +194,11 @@ function setEventHandlers() {
                         data.width, data.height);
                     users.set(data.username, game.name);
 
+                    uId = game.getLastUser();
                     // Tell socket game info
-                    socket.emit('setgameinfo', { lobbyname: game.name, id: game.getLastUser(),
-                        width: game.field_width, height: game.field_height, username: data.username });
+                    socket.emit('setgameinfo', { lobbyname: game.name, id: uId,
+                        width: game.field_width, height: game.field_height,
+                        username: data.username, hash: game.players[uId].hash });
                 });
             } else {
                 setLastError(0, data.lobbyname);
@@ -230,9 +232,15 @@ function setEventHandlers() {
                 oldgame.removeUser(data.userid);
                 if (newgame.addUser(data.username)) {
                     users.set(data.username, newgame.name);
+                    uId = newgame.getLastUser();
                     // Tell the player its game info
-                    socket.emit('setgameinfo', { lobbyname: newgame.name, id: newgame.getLastUser(),
-                            width: newgame.field_width, height: newgame.field_height, username: data.username });
+                    socket.emit('setgameinfo', { lobbyname: newgame.name, id: uId,
+                            width: newgame.field_width, height: newgame.field_height,
+                            username: data.username, hash: newgame.players[uId].hash });
+
+                    socket.broadcast.to(newgame.name).emit('userhashes', uId, newgame.players[uId].hash);
+                    socket.emit('sethashes', newgame.getAllHashes());
+
                     // If the game already started tell the player about it
                     if (newgame.gameStarted && !newgame.gameOver)
                         socket.emit('begin', sendFieldData(newgame.field));
@@ -263,9 +271,15 @@ function setEventHandlers() {
                 socket.join(data.lobbyname, function() {
                     game = roomlist.get(data.lobbyname);
                     if (game.addUser(data.username)) {
+                        uId = game.getLastUser();
                         // Tell the player its game info
-                        socket.emit('setgameinfo', { lobbyname: game.name, id: game.getLastUser(),
-                            width: game.field_width, height: game.field_height, username: data.username });
+                        socket.emit('setgameinfo', { lobbyname: game.name, id: uId,
+                            width: game.field_width, height: game.field_height,
+                            username: data.username, hash: game.players[uId].hash });
+
+                        socket.broadcast.to(game.name).emit('userhash', uId, game.players[uId].hash);
+                        socket.emit('sethashes', game.getAllHashes());
+
                         // If the game already started tell the player about it
                         if (game.gameStarted && !game.gameOver)
                             socket.emit('begin', sendFieldData(game.field));
@@ -298,7 +312,8 @@ function setEventHandlers() {
                 socket.join(lobbyname, function() {
                     game = roomlist.get(lobbyname);
                     // Tell the player its game info
-                    socket.emit('setspecinfo', game.name, game.field_width, game.field_height);
+                    socket.emit('setspecinfo', game.name, game.field_width,
+                                game.field_height, game.getAllHashes());
                     // If the game already started tell the player about it
                     socket.emit('begin', sendFieldData(game.field));
                 });
@@ -461,8 +476,10 @@ function joinDefaultGame(socket) {
         socket.join(def1, function() {
             game = roomlist.get(def1);
             game.addUser('defaultUser');
-            socket.emit('setgameinfo', { lobbyname: game.name, id: game.getLastUser(),
-                width: game.field_width, height: game.field_height, username: 'defaultUser' });
+            uId = game.getLastUser();
+            socket.emit('setgameinfo', { lobbyname: game.name, id: uId,
+                width: game.field_width, height: game.field_height, username: 'defaultUser',
+                hash: game.players[uId].hash });
             once = false;
         });
     } else if (roomlist.has(def2)) {
@@ -470,8 +487,10 @@ function joinDefaultGame(socket) {
         socket.join(def2, function() {
             game = roomlist.get(def2);
             game.addUser('defaultUser');
-            socket.emit('setgameinfo', { lobbyname: game.name, id: game.getLastUser(),
-                width: game.field_width, height: game.field_height, username: 'defaultUser' });
+            uId = game.getLastUser();
+            socket.emit('setgameinfo', { lobbyname: game.name, id: uId,
+                width: game.field_width, height: game.field_height, username: 'defaultUser',
+                hash: game.players[uId].hash });
             once = false;
         });
     }

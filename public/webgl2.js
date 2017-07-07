@@ -27,9 +27,6 @@ var cubeImageYellow;
 var cubeImageSpace;
 
 var cubeGreen;
-var cubeRed;
-var cubeBlue;
-var cubeYellow;
 var spaceBackground;
 
 var perspectiveMatrix;
@@ -59,6 +56,7 @@ var instanceOffsets;
 var instanceRotations;
 var instanceColors;
 
+var colors = [];
 var players = [];
 var gameInfo = {
     userid: 0,
@@ -68,12 +66,6 @@ var gameInfo = {
     field: [],
     username: '',
     score: 0
-};
-
-var playerColor = {
-    r: 255,
-    g: 255,
-    b: 255
 };
 
 var audio;
@@ -176,10 +168,13 @@ $(document).ready(function () {
         sendAjax('get', '/error', '#content');
     });
 
-    socket.on('setspecinfo', function(lobbyname, width, height) {
+    socket.on('setspecinfo', function(lobbyname, width, height, hashes) {
         gameInfo.lobby = lobbyname;
         gameInfo.field_width = width;
         gameInfo.field_height = height;
+        for (i = 0; i < hashes.length; i++) {
+            computeColor(i, hashes[i]);
+        }
         spectator = true;
     });
 
@@ -189,8 +184,19 @@ $(document).ready(function () {
         gameInfo.field_width = data.width;
         gameInfo.field_height = data.height;
         gameInfo.username = data.username;
-        colourUsername();
+        computeColor(gameInfo.userid, data.hash);
+        colorUsername();
         spectator = false;
+    });
+
+    socket.on('userhash', function(id, hash) {
+        computeColor(id, hash);
+    });
+
+    socket.on('sethashes', function(hashes) {
+        for (i = 0; i < hashes.length; i++) {
+            computeColor(i, hashes[i]);
+        }
     });
 
     $('#get-lobbies').on('click', function () {
@@ -218,23 +224,20 @@ function closeLobby() {
     socket.emit('endGame', { lobbyname: gameInfo.lobby, userid: gameInfo.userid });
 }
 
-function colourUsername() {
-    var hash = djb2(gameInfo.username);
-    playerColor.r = (hash & 0xFF0000) >> 16;
-    playerColor.g = (hash & 0x00FF00) >> 8;
-    playerColor.b = hash & 0x0000FF;
-
-    $('#player-name').css('color', "rgb(" + playerColor.r + ","
-                                          + playerColor.g + ","
-                                          + playerColor.b + ")");
+function playerColor(x, y, z) {
+    return { r: x, g: y, b: z};
 }
 
-function djb2(str){
-  var hash = 5381;
-  for (var i = 0; i < str.length; i++) {
-    hash = ((hash << 5) + hash) + str.charCodeAt(i); /* hash * 33 + c */
-  }
-  return hash;
+function computeColor(index, hash) {
+    colors[index] = playerColor((hash & 0xFF0000) >> 16,
+                                (hash & 0x00FF00) >> 8,
+                                 hash & 0x0000FF);
+}
+
+function colorUsername() {
+    $('#player-name').css('color', "rgb(" + colors[gameInfo.userid].r + ","
+                                          + colors[gameInfo.userid].g + ","
+                                          + colors[gameInfo.userid].b + ")");
 }
 
 function updateScore(newScore) {
@@ -448,26 +451,7 @@ function initPrograms() {
 
     programs = [programTransform, programDraw];
 
-
-
-
-    var fragmentShader = getShader(gl, "shader-fs");
-    var vertexShader = getShader(gl, "shader-vs");
-
-    // Create the shader program
-
-    shaderProgram = gl.createProgram();
-    gl.attachShader(shaderProgram, vertexShader);
-    gl.attachShader(shaderProgram, fragmentShader);
-    gl.linkProgram(shaderProgram);
-
-    //shaderProgram = createProgram(gl, getShaderSource("shader-vs"), getShaderSource("shader-fs"));
-
-    // If creating the shader program failed, alert
-
-    if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
-        alert("Unable to initialize the shader program: " + gl.getProgramInfoLog(shader));
-    }
+    shaderProgram = createProgram(gl, getShaderSource('shader-vs'), getShaderSource('shader-fs'));
 
     gl.useProgram(shaderProgram);
 
@@ -701,27 +685,12 @@ function initTextures() {
     cubeGreen = gl.createTexture();
     cubeImageGreen = new Image();
     cubeImageGreen.onload = function () { handleTextureLoaded(cubeImageGreen, cubeGreen); }
-    cubeImageGreen.src = "cubegreen.png";
-
-    cubeRed = gl.createTexture();
-    cubeImageRed = new Image();
-    cubeImageRed.onload = function () { handleTextureLoaded(cubeImageRed, cubeRed); }
-    cubeImageRed.src = "cubered.png";
-
-    cubeBlue = gl.createTexture();
-    cubeImageBlue = new Image();
-    cubeImageBlue.onload = function () { handleTextureLoaded(cubeImageBlue, cubeBlue); }
-    cubeImageBlue.src = "cubeblue.png";
-
-    cubeYellow = gl.createTexture();
-    cubeImageYellow = new Image();
-    cubeImageYellow.onload = function () { handleTextureLoaded(cubeImageYellow, cubeYellow); }
-    cubeImageYellow.src = "cubeyellow.png";
+    cubeImageGreen.src = "assets/cubegreen.png";
 
     spaceBackground = gl.createTexture();
     cubeImageSpace = new Image();
     cubeImageSpace.onload = function () { handleTextureLoaded(cubeImageSpace, spaceBackground); }
-    cubeImageSpace.src = "The-Edge-of-Space.jpg"; //"Space-Background.png";
+    cubeImageSpace.src = "assets/The-Edge-of-Space.jpg"; //"Space-Background.png";
 }
 
 function handleTextureLoaded(image, texture) {
@@ -1054,6 +1023,7 @@ function render() {
     // Set uniforms
     var time = Date.now();
     gl.uniform1f(drawTimeLocation, time);
+    gl.uniform1i(gl.getUniformLocation(programs[PROGRAM_DRAW], "uSampler"), 5);
 
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 3, NUM_INSTANCES);
 
@@ -1082,16 +1052,6 @@ function render() {
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, cubeGreen);
 
-    gl.activeTexture(gl.TEXTURE2);
-    gl.bindTexture(gl.TEXTURE_2D, cubeRed);
-
-    gl.activeTexture(gl.TEXTURE3);
-    gl.bindTexture(gl.TEXTURE_2D, cubeBlue);
-
-    gl.activeTexture(gl.TEXTURE4);
-    gl.bindTexture(gl.TEXTURE_2D, cubeYellow);
-
-
     // Draw the cube by binding the array buffer to the cube's vertices
     // array, setting attributes, and pushing it to GL.
     gl.bindBuffer(gl.ARRAY_BUFFER, cubeVerticesBuffer);
@@ -1116,7 +1076,7 @@ function render() {
         for (d1 = gameInfo.field_height-1; d1 >= 0 && empty < gameInfo.field_width; d1--) {
             empty = 0;
             for (d2 = gameInfo.field_width-1; d2 >= 0; d2--) {
-                if (gameInfo.field[d1 * gameInfo.field_width + d2] > 0 && gameInfo.field[d1 * gameInfo.field_width + d2] < 5) {
+                if (gameInfo.field[d1 * gameInfo.field_width + d2] > 0) { //&& gameInfo.field[d1 * gameInfo.field_width + d2] < 5) {
 
                     empty++;
                     // Save the current matrix, then rotate before we draw.
@@ -1125,16 +1085,10 @@ function render() {
                     //mvRotate(cubeRotation, [1, 0, 1]);
 
                     // Specify the texture to map onto the faces.
-
-                    if (gameInfo.field[d1 * gameInfo.field_width + d2] === 1) {
-                        gl.uniform1i(gl.getUniformLocation(shaderProgram, "uSampler"), 1);
-                    } else if (gameInfo.field[d1 * gameInfo.field_width + d2] === 2) {
-                        gl.uniform1i(gl.getUniformLocation(shaderProgram, "uSampler"), 2);
-                    } else if (gameInfo.field[d1 * gameInfo.field_width + d2] === 3) {
-                        gl.uniform1i(gl.getUniformLocation(shaderProgram, "uSampler"), 3);
-                    } else if (gameInfo.field[d1 * gameInfo.field_width + d2] === 4) {
-                        gl.uniform1i(gl.getUniformLocation(shaderProgram, "uSampler"), 4);
-                    }
+                    gl.uniform1i(gl.getUniformLocation(shaderProgram, "uSampler"), 1);
+                    gl.uniform3fv(gl.getUniformLocation(shaderProgram, "uColor"), [colors[gameInfo.field[d1 * gameInfo.field_width + d2]-1].r,
+                                                                                   colors[gameInfo.field[d1 * gameInfo.field_width + d2]-1].g,
+                                                                                   colors[gameInfo.field[d1 * gameInfo.field_width + d2]-1].b]);
 
                     // Draw the cube.
 
@@ -1161,16 +1115,8 @@ function render() {
                     //mvRotate(cubeRotation, [1, 0, 1]);
 
                     // Specify the texture to map onto the faces.
-                    var id = i + 1;
-                    if (id === 1) {
-                        gl.uniform1i(gl.getUniformLocation(shaderProgram, "uSampler"), 1);
-                    } else if (id === 2) {
-                        gl.uniform1i(gl.getUniformLocation(shaderProgram, "uSampler"), 2);
-                    } else if (id === 3) {
-                        gl.uniform1i(gl.getUniformLocation(shaderProgram, "uSampler"), 3);
-                    } else if (id === 4) {
-                        gl.uniform1i(gl.getUniformLocation(shaderProgram, "uSampler"), 4);
-                    }
+                    gl.uniform1i(gl.getUniformLocation(shaderProgram, "uSampler"), 1);
+                    gl.uniform3fv(gl.getUniformLocation(shaderProgram, "uColor"), [colors[i].r, colors[i].g, colors[i].b]);
 
                     // Draw the cube.
                     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeVerticesIndexBuffer);
