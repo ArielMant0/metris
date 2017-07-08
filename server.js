@@ -139,19 +139,29 @@ function setEventHandlers() {
         if (once && conf.debug)
             joinDefaultGame(socket);
 
+        socket.on('disconnect', function(username, id) {
+            if (users.has(username)) {
+                if (users.get(username).length > 0 && id >= 0)
+                    users.get(username).removeUser(id);
+                users.delete(username);
+            }
+        });
+
         // Start the game
-        socket.on('startgame', function (lobbyname) {
+        socket.on('startgame', function (lobbyname, id) {
             if (roomlist.has(lobbyname)) {
-                // Initializes the field and starts dropping stones
                 game = roomlist.get(lobbyname);
-                game.startGame();
 
-                // Start game loops for this game
-                deleteOldLoops(game.name);
-                setLoops(game);
+                if (game.isAdmin(id)) {
+                    game.startGame();
 
-                // Tell all sockets in the game what the field looks like
-                io.sockets.in(game.name).emit('begin', sendFieldData(game.field));
+                    // Start game loops for this game
+                    deleteOldLoops(game.name);
+                    setLoops(game);
+
+                    // Tell all sockets in the game what the field looks like
+                    io.sockets.in(game.name).emit('begin', sendFieldData(game.field));
+                }
             }
         });
 
@@ -231,7 +241,7 @@ function setEventHandlers() {
 
         socket.on('logout', function(username, id) {
             if (users.has(username)) {
-                if (users.get(username) != '') {
+                if (users.get(username).length > 0) {
                     game = roomlist.get(users.get(username));
                     socket.leave(game.name, function(err) {
                         if (err)
@@ -318,6 +328,8 @@ function setEventHandlers() {
                         // If the game already started tell the player about it
                         if (game.gameStarted && !game.gameOver)
                             socket.emit('begin', sendFieldData(game.field));
+
+                        socket.emit('showGame');
                     }
                 });
             } else if (roomlist.has(lobbyname) && userInGame(lobbyname, username)) {
@@ -334,10 +346,23 @@ function setEventHandlers() {
             }
         });
 
-        socket.on('endGame', function(data) {
-            if (roomlist.has(data.lobbyname)) {
-                game = roomlist.get(data.lobbyname);
-                if (game.isAdmin(data.userid))
+        socket.on('togglepause', function(lobbyname, id) {
+            if (roomlist.has(lobbyname)) {
+                game = roomlist.get(lobbyname);
+                if (game.togglePause(id)) {
+                    if (game.paused) {
+                        io.sockets.in(game.name).emit('pause');
+                    } else {
+                        io.sockets.in(game.name).emit('unpause');
+                    }
+                }
+            }
+        });
+
+        socket.on('endgame', function(lobbyname, id) {
+            if (roomlist.has(lobbyname)) {
+                game = roomlist.get(lobbyname);
+                if (game.isAdmin(id))
                     endGame(game.name, game.players, game.score, false);
             }
         });
@@ -352,6 +377,19 @@ function setEventHandlers() {
                     // If the game already started tell the player about it
                     socket.emit('begin', sendFieldData(game.field));
                 });
+            }
+        });
+
+        socket.on('endspectate', function(lobbyname) {
+            socket.leave(lobbyname);
+        });
+
+        socket.on('drop', function(lobbyname, userid, position) {
+            if (roomlist.has(lobbyname)) {
+                game = roomlist.get(lobbyname);
+                game.instaDrop(userid, position);
+
+                io.sockets.in(game.name).emit('movePlayers', sendPlayerData(game.stones));
             }
         });
     });
@@ -400,6 +438,10 @@ function endGame(lobby, players, score, leave=false) {
         game.reset();
     else
         roomlist.delete(lobby);
+
+    for (i = 0; i < players.length; i++) {
+        users.set(players[i].name, '');
+    }
 }
 
 function updateSpeed(game) {

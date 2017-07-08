@@ -98,7 +98,6 @@ var MinimalGLTFLoader = MinimalGLTFLoader || {};
                     // hierarchy needs to be post processed in the renderer
                     var curBufferViewData = loader._bufferViews[bufferViewID];
                     if (!curBufferViewData) {
-                        console.log('create new BufferView Data for ' + bufferViewID);
                         curBufferViewData = loader._bufferViews[bufferViewID] = newBufferData.slice(bufferView.byteOffset, bufferView.byteOffset + bufferView.byteLength);
                     }
                     loader._finishedPendingTasks++;

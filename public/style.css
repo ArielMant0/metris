@@ -23,10 +23,10 @@ footer p {
     justify-content: space-around;
     align-items: center;
     align-content: center;
-    margin-top: 10%;
+    margin-top: 7.5%;
 }
 
-#game-over {
+#game-pause, #game-over {
     display: none;
     position: absolute;
     left: 45%;
@@ -35,8 +35,8 @@ footer p {
     font-weight: bold;
 }
 
-#gamover-text {
-    font-size: 5;
+#gamover-text, #pause-text {
+    font-size: x-large;
 }
 
 #player-info {

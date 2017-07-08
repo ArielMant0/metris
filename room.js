@@ -160,6 +160,9 @@ module.exports.room = function() {
     }
 
     this.addUser = function(user, status=false) {
+        if (this.players.length === 0)
+            status = true;
+
         if (this.players.length < this.maxPlayers) {
             console.log("Player \'" + user + "\' joined the game \'" + this.name + "\'");
             this.players.push(new this.player(this.players.length, user, status));
@@ -179,6 +182,14 @@ module.exports.room = function() {
             return 2;
         }
         return 0;
+    }
+
+    this.togglePause = function(userid) {
+        if (this.players[userid].isAdmin) {
+            this.paused = !this.paused;
+            return true;
+        }
+        return false;
     }
 
     this.getAllHashes = function() {
@@ -232,6 +243,10 @@ module.exports.room = function() {
         return userid >= 0 && userid < this.players.length && this.players[userid].isAdmin;
     }
 
+    this.instaDrop = function(userid, pos) {
+        this.stones[userid].pos = pos;
+    }
+
     this.setStartPosition = function(userid) {
         if ((userid + 1) % 2 === 0)
             this.stones[userid].start = -PLAYER_OFFSET * Math.floor((userid + 1) / 2);
@@ -257,6 +272,8 @@ module.exports.room = function() {
             // Delete/Reset game when there is no player left
             if (this.players.length === 0)
                 this.callGameOverCallback(true);
+            else if (this.players.length === 1)
+                this.players[0].isAdmin = true;
         }
     }
 
@@ -368,6 +385,9 @@ module.exports.room = function() {
 
     this.movestone = function(key, userid) {
         // Turn Left (Q)
+        if (this.paused)
+            return;
+
         if (key === 81) {
             switch (this.stones[userid].kind) {
                 case 1: // OX

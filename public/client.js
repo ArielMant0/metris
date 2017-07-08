@@ -35,7 +35,7 @@ function initLobbyListeners() {
 
 	$('.watch-button').each(function() {
 		$(this).on('click', function () {
-			var lobbyname = $(this).attr('id').split('-')[0];
+			var lobbyname = $('#'+$(this).attr('id').split('-')[0]).text();
 			watchAsSpectator(lobbyname);
 			loadGame({ data: { gameID: lobbyname }});
 		});
@@ -45,8 +45,7 @@ function initLobbyListeners() {
 		$('.lobby-button').each(function() {
 			$(this).on('click', function () {
 				var lobbyname = $('#'+$(this).attr('id').split('-')[0]).text();
-				if (joinGame(lobbyname))
-					loadGame({ data: { gameID: lobbyname }});
+				joinGame(lobbyname);
 			});
 		});
 
