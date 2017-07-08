@@ -81,9 +81,9 @@ module.exports.room = function() {
             this.field_width = width;
             this.field_height = height;
             this.fixed = true;
+            this.maxPlayers = max > 0 ? max : 4;
             this.reset();
             this.addUser(user, true);
-            this.maxPlayers = max > 0 ? max : 4;
             console.log("Created Lobby: \'" + roomName + "\'");
             console.log("\tsize = " + this.field_width + "x" + this.field_height);
             console.log("\tcreated by = " + user);

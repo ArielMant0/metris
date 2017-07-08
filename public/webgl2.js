@@ -2,9 +2,10 @@ var gl;
 
 var PROGRAM_TRANSFORM = 0;
 var PROGRAM_DRAW = 1;
+var PROGRAM_STONE = 2;
+var PROGRAM_MODEL = 3;
 
 var programs;
-var shaderProgram;
 
 var vertexPositionAttribute;
 var textureCoordAttribute;
@@ -21,17 +22,17 @@ var cubeVertexPosBuffer;
 var cubeVertexColorBuffer;
 
 var cubeImageGreen;
-var cubeImageRed;
-var cubeImageBlue;
-var cubeImageYellow;
 var cubeImageSpace;
+var cubeImageBorder;
+var frameImage;
 
 var cubeGreen;
 var spaceBackground;
+var cubeBorder;
+var frame;
 
 var perspectiveMatrix;
 var mvMatrix;
-var perspectiveMatrix;
 
 // -- Initialize data
 var NUM_INSTANCES = 1000;
@@ -56,6 +57,9 @@ var instanceOffsets;
 var instanceRotations;
 var instanceColors;
 
+var curScene = 0;
+var vertexArrayMaps;
+
 var colors = [];
 var players = [];
 var gameInfo = {
@@ -66,7 +70,8 @@ var gameInfo = {
     field_width: 30,
     field: [],
     username: '',
-    score: 0
+    score: 0,
+    stone_drop: [-1, -1, -1, -1]
 };
 
 var audio;
@@ -114,6 +119,8 @@ $(document).ready(function () {
             var bufView = new Uint16Array(stones);
         else
             players = stones;
+
+        updateDropStone();
     });
 
     socket.on('moveScore', function (score, lvl) {
@@ -270,6 +277,35 @@ function updateLevel(newLevel) {
     $('#leveltext').text('Level: ' + level);
 }
 
+function updateDropStone() {
+    var tmp = [true, true, true, true]
+    var found = false;
+    for (i = 0; i < 4; i++) {
+        for (j = 0; j < 4; j++) {
+            if (players[gameInfo.userid][i] + gameInfo.field_width === players[gameInfo.userid][j] || players[gameInfo.userid][i] === -1)
+                tmp[i] = false;
+        }
+    }
+
+    for (k = 0; k < 4; k++) {
+        if (tmp[k] === true) {
+            var max_h = gameInfo.field_height - Math.floor(players[gameInfo.userid][k] / gameInfo.field_width)
+            for (l = 0; l < max_h; l++) {
+                if (gameInfo.field[players[gameInfo.userid][k] + (l + 1) * gameInfo.field_width] > 0 || l === max_h - 1) {
+                    if (!found || players[gameInfo.userid][0] + l * gameInfo.field_width < gameInfo.stone_drop[0]) {
+                    gameInfo.stone_drop =
+                        [players[gameInfo.userid][0] + l * gameInfo.field_width,
+                        players[gameInfo.userid][1] + l * gameInfo.field_width,
+                        players[gameInfo.userid][2] === -1 ? -1 : players[gameInfo.userid][2] + l * gameInfo.field_width,
+                        players[gameInfo.userid][3] === -1 ? -1 : players[gameInfo.userid][3] + l * gameInfo.field_width]
+                        found = true;
+                    }
+                }
+            }
+        }
+    }
+}
+
 function createLobbyFixed(lobby, fwidth, fheight, maxplayers) {
     if (gameInfo.username)
         socket.emit('createlobbyfixed', lobby, gameInfo.username, fwidth, fheight, maxplayers);
@@ -299,6 +335,7 @@ function reset(killfield=true) {
     gameInfo.field_width = 0;
     gameInfo.field_height = 0;
     gameInfo.score = 0;
+    gameInfo.stone_drop = [-1, -1, -1, -1];
     gameRunning = false;
     level = 1;
     players = [];
@@ -320,7 +357,6 @@ function joinGame(lobby) {
     if (isInGame() && lobby != gameInfo.lobby) {
         alert('You must leave your current game before joining another one!');
         return false;
-        //socket.emit('leavejoin', { oldlobby: gameInfo.lobby, userid: gameInfo.userid, newlobby: lobby, username: gameInfo.username });
     } else if (!isInGame()) {
         socket.emit('join', lobby, gameInfo.username);
         return true;
@@ -378,30 +414,9 @@ function start() {
 
         initParticleSystem();
 
+        initModels();
+
         render();
-
-        //setInterval(render, 15);
-
-        // Initialize the shaders; this is where all the lighting for the
-        // vertices and so forth is established.
-
-        /*initShaders();
-
-        // -- Init Program
-        program2 = createProgram(gl, getShaderSource('vs'), getShaderSource('fs'));
-
-        // Here's where we call the routine that builds all the objects
-        // we'll be drawing.
-
-        initBuffers();
-
-        // Next, load and set up the textures we'll be using.
-
-        initTextures();
-
-        // Set up to draw the scene periodically.
-
-        setInterval(drawScene, 15);*/
     }
 }
 
@@ -452,18 +467,18 @@ function initPrograms() {
     var vshaderTransform = createShader(gl, getShaderSource('vs-emit'), gl.VERTEX_SHADER);
     var fshaderTransform = createShader(gl, getShaderSource('fs-emit'), gl.FRAGMENT_SHADER);
 
-    var programTransform = gl.createProgram();
-    gl.attachShader(programTransform, vshaderTransform);
+    var programPartTransform = gl.createProgram();
+    gl.attachShader(programPartTransform, vshaderTransform);
     gl.deleteShader(vshaderTransform);
-    gl.attachShader(programTransform, fshaderTransform);
+    gl.attachShader(programPartTransform, fshaderTransform);
     gl.deleteShader(fshaderTransform);
 
     var varyings = ['v_offset', 'v_rotation'];
-    gl.transformFeedbackVaryings(programTransform, varyings, gl.SEPARATE_ATTRIBS);
-    gl.linkProgram(programTransform);
+    gl.transformFeedbackVaryings(programPartTransform, varyings, gl.SEPARATE_ATTRIBS);
+    gl.linkProgram(programPartTransform);
 
     // check
-    var log = gl.getProgramInfoLog(programTransform);
+    var log = gl.getProgramInfoLog(programPartTransform);
     if (log) {
         console.log(log);
     }
@@ -474,21 +489,23 @@ function initPrograms() {
     }
 
     // Setup program for draw shader
-    var programDraw = createProgram(gl, getShaderSource('vs-draw'), getShaderSource('fs-draw'));
+    var programPartDraw = createProgram(gl, getShaderSource('vs-draw'), getShaderSource('fs-draw'));
 
-    programs = [programTransform, programDraw];
+    var programStone = createProgram(gl, getShaderSource('stone-vs'), getShaderSource('stone-fs'));
 
-    shaderProgram = createProgram(gl, getShaderSource('shader-vs'), getShaderSource('shader-fs'));
+    var programModel = createProgram(gl, getShaderSource('model-vs'), getShaderSource('model-fs'));
 
-    gl.useProgram(shaderProgram);
+    programs = [programPartTransform, programPartDraw, programStone, programModel];
 
-    vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
+    gl.useProgram(programs[PROGRAM_STONE]);
+
+    vertexPositionAttribute = gl.getAttribLocation(programs[PROGRAM_STONE], "aVertexPosition");
     gl.enableVertexAttribArray(vertexPositionAttribute);
 
-    textureCoordAttribute = gl.getAttribLocation(shaderProgram, "aTextureCoord");
+    textureCoordAttribute = gl.getAttribLocation(programs[PROGRAM_STONE], "aTextureCoord");
     gl.enableVertexAttribArray(textureCoordAttribute);
 
-    vertexNormalAttribute = gl.getAttribLocation(shaderProgram, "aVertexNormal");
+    vertexNormalAttribute = gl.getAttribLocation(programs[PROGRAM_STONE], "aVertexNormal");
     gl.enableVertexAttribArray(vertexNormalAttribute);
 }
 
@@ -718,6 +735,16 @@ function initTextures() {
     cubeImageSpace = new Image();
     cubeImageSpace.onload = function () { handleTextureLoaded(cubeImageSpace, spaceBackground); }
     cubeImageSpace.src = "assets/The-Edge-of-Space.jpg"; //"Space-Background.png";
+
+    cubeBorder = gl.createTexture();
+    cubeImageBorder = new Image();
+    cubeImageBorder.onload = function () { handleTextureLoaded(cubeImageBorder, cubeBorder); }
+    cubeImageBorder.src = "assets/greyscaleborder.png";
+
+    frame = gl.createTexture();
+    frameImage = new Image();
+    frameImage.onload = function () { handleTextureLoaded(frameImage, frame); }
+    frameImage.src = "assets/frame.png";
 }
 
 function handleTextureLoaded(image, texture) {
@@ -727,6 +754,111 @@ function handleTextureLoaded(image, texture) {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
     gl.generateMipmap(gl.TEXTURE_2D);
     gl.bindTexture(gl.TEXTURE_2D, null);
+}
+
+function initModels() {
+
+    // -- Load gltf
+    var gltfUrl = "/assets/border.gltf";
+    var glTFLoader = new MinimalGLTFLoader.glTFLoader();
+
+    glTFLoader.loadGLTF(gltfUrl, function(glTF) {
+
+        curScene = glTF.scenes[glTF.defaultScene];
+
+        // -- Initialize vertex array
+        var POSITION_LOCATION = 0; // set with GLSL layout qualifier
+        var NORMAL_LOCATION = 1; // set with GLSL layout qualifier
+        var TEXCOORD_LOCATION = 2;
+        vertexArrayMaps = {};
+
+        // var in loop
+        var mesh;
+        var primitive;
+        var vertexBuffer2;
+        var indicesBuffer2;
+        var vertexArray2;
+        var i, len;
+
+        for (var mid in curScene.meshes) {
+
+            mesh = curScene.meshes[mid];
+            vertexArrayMaps[mid] = [];
+
+            for (i = 0, len = mesh.primitives.length; i < len; ++i) {
+
+                primitive = mesh.primitives[i];
+
+                // create buffers
+                vertexBuffer2 = gl.createBuffer();
+                indicesBuffer2 = gl.createBuffer();
+
+                // WebGL2: create vertexArray
+                vertexArray2 = gl.createVertexArray();
+                vertexArrayMaps[mid].push(vertexArray2);
+
+                // -- Initialize buffer
+                var vertices2 = primitive.vertexBuffer;
+                gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer2);
+                gl.bufferData(gl.ARRAY_BUFFER, vertices2, gl.STATIC_DRAW);
+                gl.bindBuffer(gl.ARRAY_BUFFER, null);
+                var indices2 = primitive.indices;
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indicesBuffer2);
+                gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices2, gl.STATIC_DRAW);
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+
+                // -- VertexAttribPointer
+                var positionInfo = primitive.attributes.POSITION;
+                gl.bindVertexArray(vertexArray2);
+                gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer2);
+
+                gl.vertexAttribPointer(
+                    POSITION_LOCATION,
+                    positionInfo.size,
+                    positionInfo.type,
+                    false,
+                    positionInfo.stride,
+                    positionInfo.offset
+                    );
+                gl.enableVertexAttribArray(POSITION_LOCATION);
+
+                var normalInfo = primitive.attributes.NORMAL;
+
+                gl.vertexAttribPointer(
+                    NORMAL_LOCATION,
+                    normalInfo.size,
+                    normalInfo.type,
+                    false,
+                    normalInfo.stride,
+                    normalInfo.offset
+                    );
+
+                gl.enableVertexAttribArray(NORMAL_LOCATION);
+
+
+
+                var texcoordInfo = primitive.attributes.TEXCOORD_0;
+
+                gl.vertexAttribPointer(
+                    TEXCOORD_LOCATION,
+                    texcoordInfo.size,
+                    texcoordInfo.type,
+                    false,
+                    texcoordInfo.stride,
+                    texcoordInfo.offset
+                    );
+
+                gl.enableVertexAttribArray(TEXCOORD_LOCATION);
+
+
+
+
+                gl.bindBuffer(gl.ARRAY_BUFFER, null);
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indicesBuffer2);
+                gl.bindVertexArray(null);
+            }
+        }
+    });
 }
 
 function initParticleSystem() {
@@ -975,15 +1107,12 @@ function render() {
     // and 100 units away from the camera.
     var screenaspect = window.innerWidth / window.innerHeight;
 
-    perspectiveMatrix = makePerspective(45, screenaspect, 0.1, 1000.0);
-
-    // Set the drawing position to the "identity" point, which is
-    // the center of the scene.
-    loadIdentity();
+    perspectiveMatrix = mat4.create();
+    mat4.perspective(perspectiveMatrix, Math.PI / 4.0, screenaspect, 0.1, 1000.0);
 
     // Now move the drawing position a bit to where we want to start
     // drawing the cube.
-    gl.useProgram(shaderProgram);
+    gl.useProgram(programs[PROGRAM_STONE]);
 
     // Draw the cube by binding the array buffer to the cube's vertices
     // array, setting attributes, and pushing it to GL.
@@ -1010,19 +1139,20 @@ function render() {
     ///////////////////////////////////////
     gl.disable(gl.DEPTH_TEST);
 
-    gl.activeTexture(gl.TEXTURE5);
+    gl.activeTexture(gl.TEXTURE2);
     gl.bindTexture(gl.TEXTURE_2D, spaceBackground);
 
-    mvPushMatrix();
-    mvTranslate([0.0, 0.0, -0.15]);
+    translate = vec3.create();
+    vec3.set(translate, 0, 0, -0.15);
 
-    gl.uniform1i(gl.getUniformLocation(shaderProgram, "uSampler"), 5);
+    mvMatrix = mat4.create();
+    mat4.translate(mvMatrix, mvMatrix, translate);
+
+    gl.uniform1i(gl.getUniformLocation(programs[PROGRAM_STONE], "uSampler"), 2);
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeVerticesIndexBuffer);
     setMatrixUniforms();
     gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
-
-    mvPopMatrix();
 
     gl.enable(gl.DEPTH_TEST);
 
@@ -1050,7 +1180,7 @@ function render() {
     // Set uniforms
     var time = Date.now();
     gl.uniform1f(drawTimeLocation, time);
-    gl.uniform1i(gl.getUniformLocation(programs[PROGRAM_DRAW], "uSampler"), 5);
+    gl.uniform1i(gl.getUniformLocation(programs[PROGRAM_DRAW], "uSampler"), 2);
 
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 3, NUM_INSTANCES);
 
@@ -1060,24 +1190,108 @@ function render() {
     gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 0, null);
     gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 1, null);
 
+    gl.bindVertexArray(null);
 
     ///////////////////////////////////////
-    // Tetris
+    // Models
     ///////////////////////////////////////
-    perspectiveMatrix = makePerspective(45, screenaspect, 0.1, 1000.0);
-
-    // Set the drawing position to the "identity" point, which is
-    // the center of the scene.
-    loadIdentity();
-
-    gl.useProgram(shaderProgram);
-
     var a = gameInfo.field_width / screenaspect > gameInfo.field_height ? gameInfo.field_width / screenaspect + (gameInfo.field_width / screenaspect * 0.1) : gameInfo.field_height + (gameInfo.field_height * 0.1);
     var trans = (a / Math.sin(Math.PI / 8)) * Math.sin(Math.PI / 4 + Math.PI / 8);
-    mvTranslate([0.0, 0.0, -trans]);
+
+    var uniformMVLocations = gl.getUniformLocation(programs[PROGRAM_MODEL], "uMVMatrix");
+    var uniformMvNormalLocations = gl.getUniformLocation(programs[PROGRAM_MODEL], "mvNormal");
+    var uniformPLocations = gl.getUniformLocation(programs[PROGRAM_MODEL], "uPMatrix");
+
+    gl.activeTexture(gl.TEXTURE3);
+    gl.bindTexture(gl.TEXTURE_2D, frame);
+
+    gl.useProgram(programs[PROGRAM_MODEL]);
+
+    // -- Render preparation
+    gl.enable(gl.DEPTH_TEST);
+    gl.depthFunc(gl.LEQUAL);
+
+    var rotatationY = Math.PI / 2.0;
+
+    var localMV;
+    var localMVP;
+    var localMVNormal;
+    var modelView;
+    var scale;
+    var translate;
+
+    for (h = 0; h < 4; h++) {
+        localMV = mat4.create();
+        localMVP = mat4.create();
+        localMVNormal = mat4.create();
+
+        translate = vec3.create();
+        if (h === 0)
+            vec3.set(translate, gameInfo.field_width + 1, 0, -trans);
+        else if (h === 1)
+            vec3.set(translate, -gameInfo.field_width - 1, 0, -trans);
+        else if (h === 2)
+            vec3.set(translate, 0, gameInfo.field_height + 1, -trans);
+        else if (h === 3)
+            vec3.set(translate, 0, -gameInfo.field_height - 1, -trans);
+
+        scale = vec3.create();
+        var scale_r;
+        if (h === 0 || h === 1)
+            scale_r = gameInfo.field_height / 10.0; // breite, tiefe, höhe
+        else
+            scale_r = gameInfo.field_width / 10.0;
+        vec3.set(scale, 1.0, 1.0, scale_r);
+
+        modelView = mat4.create();
+
+        mat4.translate(modelView, modelView, translate);
+
+        //mat4.rotateZ(modelView, modelView, rotatationY);
+        mat4.rotateX(modelView, modelView, rotatationY);
+        if (h === 2 || h === 3)
+            mat4.rotateY(modelView, modelView, rotatationY);
+
+        mat4.scale(modelView, modelView, scale);
+
+        for (var mid in curScene.meshes) {
+            mesh = curScene.meshes[mid];
+
+            for (i = 0, len = mesh.primitives.length; i < len; ++i) {
+                primitive = mesh.primitives[i];
+
+                mat4.multiply(localMV, modelView, primitive.matrix);
+
+                mat4.invert(localMVNormal, localMV);
+                mat4.transpose(localMVNormal, localMVNormal);
+
+                gl.bindVertexArray(vertexArrayMaps[mid][i]);
+
+                gl.uniformMatrix4fv(uniformMVLocations, false, localMV);
+                gl.uniformMatrix4fv(uniformMvNormalLocations, false, localMVNormal);
+                gl.uniformMatrix4fv(uniformPLocations, false, perspectiveMatrix);
+                gl.uniform1i(gl.getUniformLocation(programs[PROGRAM_MODEL], "uSampler"), 3);
+
+                gl.uniform1fv(gl.getUniformLocation(programs[PROGRAM_MODEL], "scale"), [scale_r]);
+
+                gl.drawElements(primitive.mode, primitive.indices.length, primitive.indicesComponentType, 0);
+
+                gl.bindVertexArray(null);
+            }
+        }
+    }
+
+
+    ///////////////////////////////////////
+    // Tetrisfield
+    ///////////////////////////////////////
+    gl.useProgram(programs[PROGRAM_STONE]);
 
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, cubeGreen);
+
+    gl.activeTexture(gl.TEXTURE4);
+    gl.bindTexture(gl.TEXTURE_2D, cubeBorder);
 
     // Draw the cube by binding the array buffer to the cube's vertices
     // array, setting attributes, and pushing it to GL.
@@ -1106,26 +1320,24 @@ function render() {
                 if (gameInfo.field[d1 * gameInfo.field_width + d2] > 0) { //&& gameInfo.field[d1 * gameInfo.field_width + d2] < 5) {
 
                     empty++;
-                    // Save the current matrix, then rotate before we draw.
-                    mvPushMatrix();
-                    mvTranslate([d2 * 2 - gameInfo.field_width + 1, gameInfo.field_height - d1 * 2 - 1, 0]);
-                    //mvRotate(cubeRotation, [1, 0, 1]);
+
+                    translate = vec3.create();
+                    vec3.set(translate, d2 * 2 - gameInfo.field_width + 1, gameInfo.field_height - d1 * 2 - 1, -trans);
+
+                    mvMatrix = mat4.create();
+                    mat4.translate(mvMatrix, mvMatrix, translate);
 
                     // Specify the texture to map onto the faces.
-                    gl.uniform1i(gl.getUniformLocation(shaderProgram, "uSampler"), 1);
-                    gl.uniform3fv(gl.getUniformLocation(shaderProgram, "uColor"), [colors[gameInfo.field[d1 * gameInfo.field_width + d2]-1].r,
-                                                                                   colors[gameInfo.field[d1 * gameInfo.field_width + d2]-1].g,
-                                                                                   colors[gameInfo.field[d1 * gameInfo.field_width + d2]-1].b]);
+                    gl.uniform1i(gl.getUniformLocation(programs[PROGRAM_STONE], "uSampler"), 1);
+                    gl.uniform3fv(gl.getUniformLocation(programs[PROGRAM_STONE], "uColor"), [colors[gameInfo.field[d1 * gameInfo.field_width + d2]-1].r,
+                                                                                             colors[gameInfo.field[d1 * gameInfo.field_width + d2]-1].g,
+                                                                                             colors[gameInfo.field[d1 * gameInfo.field_width + d2]-1].b]);
 
                     // Draw the cube.
-
                     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeVerticesIndexBuffer);
                     setMatrixUniforms();
+
                     gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
-
-                    // Restore the original matrix
-
-                    mvPopMatrix();
                 }
             }
         }
@@ -1135,141 +1347,79 @@ function render() {
         for (i = 0; i < players.length; i++) {
             for (d2 = 0; d2 < players[i].length; d2++) {
                 if (players[i][d2] >= 0) {
-                    // Save the current matrix, then rotate before we draw.
-                    mvPushMatrix();
-                    mvTranslate([Math.floor(players[i][d2] % gameInfo.field_width) * 2 - gameInfo.field_width + 1,
-                        gameInfo.field_height - Math.floor(players[i][d2] / gameInfo.field_width) * 2 - 1, 0]);
-                    //mvRotate(cubeRotation, [1, 0, 1]);
+
+                    translate = vec3.create();
+                    vec3.set(translate,
+                        Math.floor(players[i][d2] % gameInfo.field_width) * 2 - gameInfo.field_width + 1,
+                        gameInfo.field_height - Math.floor(players[i][d2] / gameInfo.field_width) * 2 - 1,
+                        -trans);
+
+                    mvMatrix = mat4.create();
+                    mat4.translate(mvMatrix, mvMatrix, translate);
 
                     // Specify the texture to map onto the faces.
-                    gl.uniform1i(gl.getUniformLocation(shaderProgram, "uSampler"), 1);
-                    gl.uniform3fv(gl.getUniformLocation(shaderProgram, "uColor"), [colors[i].r, colors[i].g, colors[i].b]);
+                    gl.uniform1i(gl.getUniformLocation(programs[PROGRAM_STONE], "uSampler"), 1);
+                    gl.uniform3fv(gl.getUniformLocation(programs[PROGRAM_STONE], "uColor"), [colors[i].r, colors[i].g, colors[i].b]);
 
                     // Draw the cube.
                     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeVerticesIndexBuffer);
                     setMatrixUniforms();
                     gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
-
-                    // Restore the original matrix
-                    mvPopMatrix();
                 }
             }
         }
     }
 
+    ///////////////////////////////////////
+    // gameInfo.stone_drop
+    ///////////////////////////////////////
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+
+    if (typeof gameInfo.stone_drop !== 'undefined') {
+        for (i = 0; i < gameInfo.stone_drop.length; i++) {
+            if (gameInfo.stone_drop[i] >= 0) {
+
+                translate = vec3.create();
+                vec3.set(translate,
+                    Math.floor(gameInfo.stone_drop[i] % gameInfo.field_width) * 2 - gameInfo.field_width + 1,
+                    gameInfo.field_height - Math.floor(gameInfo.stone_drop[i] / gameInfo.field_width) * 2 - 1,
+                    -trans);
+
+                mvMatrix = mat4.create();
+                mat4.translate(mvMatrix, mvMatrix, translate);
+
+                gl.uniform1i(gl.getUniformLocation(programs[PROGRAM_STONE], "uSampler"), 4);
+                gl.uniform3fv(gl.getUniformLocation(programs[PROGRAM_STONE], "uColor"), [colors[gameInfo.userid].r,
+                                                                                         colors[gameInfo.userid].g,
+                                                                                         colors[gameInfo.userid].b]);
+
+                // Draw the cube.
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeVerticesIndexBuffer);
+
+                setMatrixUniforms();
+                gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
+            }
+        }
+    }
+    gl.disable(gl.BLEND);
+
     requestAnimationFrame(render);
 }
 
 //
-// getShader
+// Set Matrix
 //
-// Loads a shader program by scouring the current document,
-// looking for a script with the specified ID.
-//
-function getShader(gl, id) {
-    var shaderScript = document.getElementById(id);
-
-    // Didn't find an element with the specified ID; abort.
-
-    if (!shaderScript) {
-        return null;
-    }
-
-    // Walk through the source element's children, building the
-    // shader source string.
-
-    var theSource = "";
-    var currentChild = shaderScript.firstChild;
-
-    while (currentChild) {
-        if (currentChild.nodeType == 3) {
-            theSource += currentChild.textContent;
-        }
-
-        currentChild = currentChild.nextSibling;
-    }
-
-    // Now figure out what type of shader script we have,
-    // based on its MIME type.
-
-    var shader;
-
-    if (shaderScript.type == "x-shader/x-fragment") {
-        shader = gl.createShader(gl.FRAGMENT_SHADER);
-    } else if (shaderScript.type == "x-shader/x-vertex") {
-        shader = gl.createShader(gl.VERTEX_SHADER);
-    } else {
-        return null;  // Unknown shader type
-    }
-
-    // Send the source to the shader object
-
-    gl.shaderSource(shader, theSource);
-
-    // Compile the shader program
-
-    gl.compileShader(shader);
-
-    // See if it compiled successfully
-
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        alert("An error occurred compiling the shaders: " + gl.getShaderInfoLog(shader));
-        return null;
-    }
-
-    return shader;
-}
-
-//
-// Matrix utility functions
-//
-
-function loadIdentity() {
-    mvMatrix = Matrix.I(4);
-}
-
-function multMatrix(m) {
-    mvMatrix = mvMatrix.x(m);
-}
-
-function mvTranslate(v) {
-    multMatrix(Matrix.Translation($V([v[0], v[1], v[2]])).ensure4x4());
-}
-
 function setMatrixUniforms() {
-    var pUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
-    gl.uniformMatrix4fv(pUniform, false, new Float32Array(perspectiveMatrix.flatten()));
+    var pUniform = gl.getUniformLocation(programs[PROGRAM_STONE], "uPMatrix");
+    gl.uniformMatrix4fv(pUniform, false, perspectiveMatrix);
 
-    var mvUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix");
-    gl.uniformMatrix4fv(mvUniform, false, new Float32Array(mvMatrix.flatten()));
+    var mvUniform = gl.getUniformLocation(programs[PROGRAM_STONE], "uMVMatrix");
+    gl.uniformMatrix4fv(mvUniform, false, mvMatrix);
 
-    var normalMatrix = mvMatrix.inverse();
-    normalMatrix = normalMatrix.transpose();
-    var nUniform = gl.getUniformLocation(shaderProgram, "uNormalMatrix");
-    gl.uniformMatrix4fv(nUniform, false, new Float32Array(normalMatrix.flatten()));
-}
-
-var mvMatrixStack = [];
-
-function mvPushMatrix(m) {
-    if (m) {
-        mvMatrixStack.push(m.dup());
-        mvMatrix = m.dup();
-    } else {
-        mvMatrixStack.push(mvMatrix.dup());
-    }
-}
-
-function mvPopMatrix() {
-    if (!mvMatrixStack.length) {
-        throw ("Can't pop from an empty matrix stack.");
-    }
-    mvMatrix = mvMatrixStack.pop();
-    return mvMatrix;
-}
-
-function mvRotate(angle, v) {
-    var inRadians = angle * Math.PI / 180.0;
-    var m = Matrix.Rotation(inRadians, $V([v[0], v[1], v[2]])).ensure4x4();
-    multMatrix(m);
+    var normalMatrix = mat4.create();
+    mat4.invert(normalMatrix, mvMatrix);
+    mat4.transpose(normalMatrix, normalMatrix);
+    var nUniform = gl.getUniformLocation(programs[PROGRAM_STONE], "uNormalMatrix");
+    gl.uniformMatrix4fv(nUniform, false, normalMatrix);
 }

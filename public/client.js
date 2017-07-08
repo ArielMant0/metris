@@ -44,7 +44,7 @@ function initLobbyListeners() {
 	if (isLoggedIn()) {
 		$('.lobby-button').each(function() {
 			$(this).on('click', function () {
-				var lobbyname = $(this).attr('id').split('-')[0];
+				var lobbyname = $('#'+$(this).attr('id').split('-')[0]).text();
 				if (joinGame(lobbyname))
 					loadGame({ data: { gameID: lobbyname }});
 			});

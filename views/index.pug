@@ -14,33 +14,10 @@ html(lang='en')
         script(src='glUtils.js', type='text/javascript')
         script(src='webgl2.js', type='text/javascript')
         script(src='utility.js', type='text/javascript')
+        script(src='gl-matrix-min.js', type='text/javascript')
+        script(src='gltf-loader.js', type='text/javascript')
 
-        script(id='shader-fs', type='x-shader/x-fragment').
-            #version 300 es
-
-            precision highp float;
-
-            in highp vec2 vTextureCoord;
-            in highp vec3 vLighting;
-
-            uniform sampler2D uSampler;
-            uniform vec3 uColor;
-
-            out vec4 color;
-
-            void main(void) {
-                highp vec4 texelColor = texture(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));
-
-                color = vec4(texelColor.rgb * vLighting, texelColor.a);
-                if (texelColor.r == texelColor.g && texelColor.b == texelColor.g) {
-                    color.r = color.r * (uColor.r/255.0);
-                    color.g = color.g * (uColor.g/255.0);
-                    color.b = color.b * (uColor.b/255.0);
-                    color.a = 1.0;
-                }
-            }
-
-        script(id='shader-vs', type='x-shader/x-vertex').
+        script(id='stone-vs', type='x-shader/x-vertex').
             #version 300 es
 
             in highp vec3 aVertexNormal;
@@ -68,6 +45,88 @@ html(lang='en')
 
                 highp float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
                 vLighting = ambientLight + (directionalLightColor * directional);
+            }
+
+        script(id='stone-fs', type='x-shader/x-fragment').
+            #version 300 es
+
+            precision highp float;
+
+            in highp vec2 vTextureCoord;
+            in highp vec3 vLighting;
+
+            uniform sampler2D uSampler;
+            uniform vec3 uColor;
+
+            out vec4 color;
+
+            void main(void) {
+                highp vec4 texelColor = texture(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));
+
+                color = vec4(texelColor.rgb * vLighting, texelColor.a);
+                if (texelColor.r == texelColor.g && texelColor.b == texelColor.g) {
+                    color.r = color.r * (uColor.r/255.0);
+                    color.g = color.g * (uColor.g/255.0);
+                    color.b = color.b * (uColor.b/255.0);
+                    color.a = texelColor.a;
+                }
+            }
+
+        script(id='model-vs', type='x-shader/x-vertex').
+            #version 300 es
+            #define POSITION_LOCATION 0
+            #define NORMAL_LOCATION 1
+            #define TEXCOORD_LOCATION 2
+
+            precision highp float;
+            precision highp int;
+
+            uniform highp mat4 uMVMatrix;
+            uniform highp mat4 mvNormal;
+            uniform highp mat4 uPMatrix;
+            uniform highp float scale;
+
+            layout(location = POSITION_LOCATION) in highp vec3 position;
+            layout(location = NORMAL_LOCATION) in highp vec3 normal;
+            layout(location = TEXCOORD_LOCATION) in highp vec2 texcoord;
+
+            out vec3 v_normal;
+            out vec2 v_texcoord;
+
+            void main()
+            {
+                mat2 m2x2 = mat2(
+                    1.0, 0.0,
+                    0.0, scale
+                );
+
+                v_normal = normalize((mvNormal * vec4(normal, 0)).xyz);
+                v_texcoord = m2x2 * texcoord;
+                gl_Position = uPMatrix * uMVMatrix * vec4(position, 1.0);
+            }
+
+        script(id='model-fs', type='x-shader/x-fragment').
+            #version 300 es
+            #define FRAG_COLOR_LOCATION 0
+
+
+            precision highp float;
+            precision highp int;
+
+            in vec3 v_normal;
+            in vec2 v_texcoord;
+
+            uniform sampler2D uSampler;
+
+            layout(location = FRAG_COLOR_LOCATION) out vec4 color;
+
+            void main()
+            {
+                highp vec4 texelColor = texture(uSampler, vec2(v_texcoord.s, v_texcoord.t));
+
+                color = vec4(texelColor.rgb, texelColor.a);
+
+                //color = vec4(v_normal, 1.0);
             }
 
         script(id="vs-emit", type="x-shader/x-vertex").
