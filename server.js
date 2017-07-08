@@ -188,10 +188,10 @@ function setEventHandlers() {
                     // Tell socket game info
                     socket.emit('setgameinfo', { lobbyname: game.name, id: uId,
                         width: game.field_width, height: game.field_height,
-                        username: username, hash: game.players[uId].hash });
+                        username: username, hash: game.players[uId].hash, gameid: game.id });
                 });
             } else {
-                setLastError(0, data.lobbyname);
+                setLastError(0, lobbyname);
                 socket.emit('dataerror');
             }
         });
@@ -210,10 +210,10 @@ function setEventHandlers() {
                     // Tell socket game info
                     socket.emit('setgameinfo', { lobbyname: game.name, id: uId,
                         width: game.field_width, height: game.field_height,
-                        username: username, hash: game.players[uId].hash });
+                        username: username, hash: game.players[uId].hash, gameid: game.id });
                 });
             } else {
-                setLastError(0, data.lobbyname);
+                setLastError(0, lobbyname);
                 socket.emit('dataerror');
             }
         });
@@ -305,7 +305,7 @@ function setEventHandlers() {
                         // Tell the player its game info
                         socket.emit('setgameinfo', { lobbyname: game.name, id: uId,
                             width: game.field_width, height: game.field_height,
-                            username: username, hash: game.players[uId].hash });
+                            username: username, hash: game.players[uId].hash, gameid: game.id });
 
                         socket.broadcast.to(game.name).emit('userhash', uId, game.players[uId].hash);
                         socket.emit('sethashes', game.getAllHashes());
@@ -321,8 +321,7 @@ function setEventHandlers() {
                     }
                 });
             } else if (roomlist.has(lobbyname) && userInGame(lobbyname, username)) {
-                game = roomlist.get(lobbyname);
-                users.set(username, lobbyname);
+                game = roomlist.get(lobbyname);;
                 if (!game.gameStarted) {
                     game.startGame();
 

@@ -62,6 +62,7 @@ module.exports.room = function() {
     this.createRoom = function(roomName, roomID, user) {
         if (!this.gameStarted && !this.gameOver) {
             this.name = roomName;
+            this.id = roomID;
             this.field_width = DEFAULT_WIDTH;
             this.field_height = DEFAULT_HEIGHT;
             this.fixed = false;
@@ -76,6 +77,7 @@ module.exports.room = function() {
     this.createRoomFixed = function(roomName, roomID, user, width, height, max) {
         if (!this.gameStarted && !this.gameOver) {
             this.name = roomName;
+            this.id = roomID;
             this.field_width = width;
             this.field_height = height;
             this.fixed = true;

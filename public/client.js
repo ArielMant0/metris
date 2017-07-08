@@ -51,19 +51,18 @@ function initLobbyListeners() {
 		});
 
 		if (isInGame()) {
-			$('#'+gameInfo.lobby + '-join').text('Leave');
-			$('#'+gameInfo.lobby + '-join').addClass('joined');
-			$('#'+gameInfo.lobby + '-join').off();
-			$('#'+gameInfo.lobby + '-join').on('click', function() {
+			$('#' + gameInfo.gameid + '-join').text('Leave');
+			$('#' + gameInfo.gameid + '-join').addClass('joined');
+			$('#' + gameInfo.gameid + '-join').off();
+			$('#' + gameInfo.gameid + '-join').on('click', function() {
 				leaveGame();
 				loadLobbies();
 			});
 
-			$('#'+gameInfo.lobby + '-watch').text('Go');
-			$('#'+gameInfo.lobby + '-watch').addClass('nonspec');
-			$('#'+gameInfo.lobby + '-watch').off();
-			$('#'+gameInfo.lobby + '-watch').on('click', { gameID: gameInfo.lobby }, loadGame);
-
+			$('#' + gameInfo.gameid + '-watch').text('Go');
+			$('#' + gameInfo.gameid + '-watch').addClass('nonspec');
+			$('#' + gameInfo.gameid + '-watch').off();
+			$('#' + gameInfo.gameid + '-watch').on('click', { gameID: gameInfo.lobby }, loadGame);
 		}
 
 		$('#create-lobby').on('click', function() {

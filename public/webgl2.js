@@ -60,6 +60,7 @@ var colors = [];
 var players = [];
 var gameInfo = {
     userid: 0,
+    gameid: 0,
     lobby: '',
     field_height: 16,
     field_width: 30,
@@ -202,6 +203,7 @@ $(document).ready(function () {
         gameInfo.field_width = data.width;
         gameInfo.field_height = data.height;
         gameInfo.username = data.username;
+        gameInfo.gameid = data.gameid;
         computeColor(gameInfo.userid, data.hash);
         colorUsername();
         spectator = false;
@@ -283,11 +285,11 @@ function setPlayerName(name) {
 }
 
 function isLoggedIn() {
-    return gameInfo.username !== '';
+    return gameInfo.username.length > 0;
 }
 
 function isInGame() {
-    return !spectator && gameInfo.lobby !== '';
+    return !spectator && gameInfo.lobby.length > 0;
 }
 
 function reset(killfield=true) {

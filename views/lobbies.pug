@@ -31,8 +31,8 @@ div(class='lobby-list')
         div(class='lobby-entry' id='lobby-actions') Available Actions
     each lobby in lobbies
         div(class='lobby-entry-container')
-            div(class='lobby-entry', id=lobby.name) #{lobby.name}
+            div(class='lobby-entry', id=lobby.id) #{lobby.name}
             div(class='lobby-entry') #{lobby.currentPlayers} / #{lobby.maxPlayers}
             div(class='lobby-entry lobby-button-container')
-                button(class='lobby-button', id=lobby.name+'-join') Join
-                button(class='watch-button', id=lobby.name+'-watch') Watch
+                button(class='lobby-button', id=lobby.id+'-join') Join
+                button(class='watch-button', id=lobby.id+'-watch') Watch
