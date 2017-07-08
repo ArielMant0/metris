@@ -1,11 +1,13 @@
 - var i = 1;
 
-div(id='score-container')
-    ol(class='score-list')
-        each player in scores
-            li(class='score-entry')
-                span(id='score-name') #{i}. #{player.name}
-                span(id='score-value') (#{player.score})
-                span(id='score-game') #{player.game}
-                span(id='score-date') #{player.date}
-                - i++
+div(class='score-list')
+    div(class='score-entry score-desc') Player
+    div(class='score-entry score-desc') Score
+    div(class='score-entry score-desc') Game Name
+    div(class='score-entry score-desc') Date
+    each player in scores
+        div(class='score-entry', id='score-name') #{i}. #{player.name}
+        div(class='score-entry', id='score-value') (#{player.score})
+        div(class='score-entry', id='score-game') #{player.game}
+        div(class='score-entry', id='score-date') #{player.date}
+        - i++

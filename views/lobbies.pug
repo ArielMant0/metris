@@ -7,25 +7,32 @@ div(class='modal', id='create-modal')
             label(for='lobby-name') Lobby Name
             input(type='text', id='lobby-name', required)
         span(class='create-entry')
+            label(for='fixed-size') Fixed Size
+            input(type='checkbox', id='fixed-size')
+        span(class='create-entry on-fixed')
+            label(for='max-players') Max Players
+            label(for='max-players', id='max-players-desc') 1
+            input(type='range', id='max-players', min='1', max='25', step='1', value='1')
+        span(class='create-entry on-fixed')
             label(for='field-width') Field Width
-            select(id='field-width')
-                option 30
-                option 40
-                option 60
-                option 100
-        span(class='create-entry')
+            label(for='field-width', id='field-width-desc') 10
+            input(type='range', id='field-width', min='10', max='100', step='10', value='10')
+        span(class='create-entry on-fixed')
             label(for='field-height') Field Height
-            select(id='field-height')
-                option 16
-                option 20
-                option 40
-                option 60
+            label(for='field-height', id='field-height-desc') 10
+            input(type='range', id='field-height', min='10', max='100', step='10', value='10')
         button(type='submit', id='submit-lobby') Create
 
 
-ul(class='lobby-list')
+div(class='lobby-list')
+    div(class='lobby-entry-container' id='lobby-desc')
+        div(class='lobby-entry') Lobby Name
+        div(class='lobby-entry') Players
+        div(class='lobby-entry' id='lobby-actions') Available Actions
     each lobby in lobbies
-        li(class='lobby-entry', id=lobby.name) #{lobby.name}
-            div(id='lobb-button-container')
+        div(class='lobby-entry-container')
+            div(class='lobby-entry', id=lobby.name) #{lobby.name}
+            div(class='lobby-entry') #{lobby.currentPlayers} / #{lobby.maxPlayers}
+            div(class='lobby-entry lobby-button-container')
                 button(class='lobby-button', id=lobby.name+'-join') Join
                 button(class='watch-button', id=lobby.name+'-watch') Watch

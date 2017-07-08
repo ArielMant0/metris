@@ -112,7 +112,7 @@ $(document).ready(function () {
         if (readBinary)
             var bufView = new Uint16Array(stones);
         else
-            players = stones.slice(0);
+            players = stones;
     });
 
     socket.on('moveScore', function (score, lvl) {
@@ -145,6 +145,24 @@ $(document).ready(function () {
         updateLevel(level);
     });
 
+    socket.on('resizefield', function(width, height, field, stones) {
+        gameInfo.field_width = width;
+        gameInfo.field_height = height;
+        if (readBinary) {
+            var bufView1 = new Uint8Array(field);
+            gameInfo.field = Array.prototype.slice.call(bufView1);
+            var bufView2 = new Uint16Array(stones);
+            players = Array.prototype.slice.call(bufView2);
+        } else {
+            gameInfo.field = field;
+            players = stones;
+        }
+    });
+
+    socket.on('leaveroom', function() {
+        socket.emit('leave', gameInfo.lobby, gameInfo.userid, gameInfo.username);
+    });
+
     socket.on('leftgame', function() {
         reset();
     });
@@ -161,7 +179,7 @@ $(document).ready(function () {
     socket.on('gameover', function() {
         $('#gameover-score').html('Final Score: ' + gameInfo.score);
         $('#game-over').css('display', 'block');
-        reset();
+        reset(false);
     });
 
     socket.on('dataerror', function() {
@@ -250,10 +268,14 @@ function updateLevel(newLevel) {
     $('#leveltext').text('Level: ' + level);
 }
 
-function createLobby(lobby, fwidth, fheight) {
+function createLobbyFixed(lobby, fwidth, fheight, maxplayers) {
     if (gameInfo.username)
-        socket.emit('createlobby', { lobbyname: lobby, username: gameInfo.username,
-                                     width: fwidth, height: fheight });
+        socket.emit('createlobbyfixed', lobby, gameInfo.username, fwidth, fheight, maxplayers);
+}
+
+function createLobby(lobby) {
+    if (gameInfo.username)
+        socket.emit('createlobby', lobby, gameInfo.username);
 }
 
 function setPlayerName(name) {
@@ -268,7 +290,7 @@ function isInGame() {
     return !spectator && gameInfo.lobby !== '';
 }
 
-function reset() {
+function reset(killfield=true) {
     $('#player-name').css('color', 'white');
     gameInfo.lobby = '';
     gameInfo.userid = -1;
@@ -276,40 +298,43 @@ function reset() {
     gameInfo.field_height = 0;
     gameInfo.score = 0;
     gameRunning = false;
-    gameInfo.field = [];
     level = 1;
     players = [];
-    audio.pause();
-    audio.currentTime = 0;
     spectator = false;
+
+    if (killfield) {
+        audio.pause();
+        audio.currentTime = 0;
+        gameInfo.field = [];
+    }
 }
 
 // Send player movement
 function submitmove(key) {
-    socket.emit('playermove', { key: key, userid: gameInfo.userid, lobbyname: gameInfo.lobby });
+    socket.emit('playermove', gameInfo.lobby, key, gameInfo.userid);
 }
 
 function joinGame(lobby) {
-    spectator = false;
     if (isInGame() && lobby != gameInfo.lobby) {
-        gameInfo.field = [];
-        socket.emit('leavejoin', { oldlobby: gameInfo.lobby, userid: gameInfo.userid, newlobby: lobby, username: gameInfo.username });
+        alert('You must leave your current game before joining another one!');
+        return false;
+        //socket.emit('leavejoin', { oldlobby: gameInfo.lobby, userid: gameInfo.userid, newlobby: lobby, username: gameInfo.username });
     } else if (!isInGame()) {
-        socket.emit('join', { lobbyname: lobby, username: gameInfo.username });
+        socket.emit('join', lobby, gameInfo.username);
+        return true;
     }
 }
 
-function leaveGame(lobby) {
+function leaveGame() {
     socket.emit('leave', gameInfo.lobby, gameInfo.userid, gameInfo.username);
 }
 
 function sendLogin(name) {
-    socket.emit('login', { username: name });
+    socket.emit('login', name);
 }
 
 function sendLogout() {
-    spectator = false;
-    socket.emit('logout', { username: gameInfo.username });
+    socket.emit('logout', gameInfo.username, gameInfo.userid);
 }
 
 // Start the game in the current lobby
@@ -320,9 +345,9 @@ function startgame() {
     // Socket senden
     if (!gameRunning) {
         audio.currentTime = 0;
-        socket.emit('startgame', { width: gameInfo.field_width, height: gameInfo.field_height, lobbyname: gameInfo.lobby });
+        socket.emit('startgame', gameInfo.lobby);
     } else {
-        socket.emit('updategame', { lobbyname: gameInfo.lobby });
+        socket.emit('updategame', gameInfo.lobby);
     }
 
     audio.play();

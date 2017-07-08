@@ -45,8 +45,8 @@ function initLobbyListeners() {
 		$('.lobby-button').each(function() {
 			$(this).on('click', function () {
 				var lobbyname = $(this).attr('id').split('-')[0];
-				joinGame(lobbyname);
-				loadGame({ data: { gameID: lobbyname }});
+				if (joinGame(lobbyname))
+					loadGame({ data: { gameID: lobbyname }});
 			});
 		});
 
@@ -74,8 +74,25 @@ function initLobbyListeners() {
 		$('#login-button').text('Logout');
 		$('#login-button').on('click', function() {
     		logout();
-    		loadLobbies();
     	});
+
+    	$('#fixed-size').on('change', function() {
+			adjustHidden('#fixed-size');
+		});
+
+		adjustHidden('#fixed-size');
+
+		$('#max-players').on('input', function() {
+			$('#max-players-desc').text($('#max-players').val());
+		});
+
+		$('#field-width').on('input', function() {
+			$('#field-width-desc').text($('#field-width').val());
+		});
+
+		$('#field-height').on('input', function() {
+			$('#field-height-desc').text($('#field-height').val());
+		});
 	} else {
 		$('.lobby-button').each(function() {
 			$(this).on('click', joinForm);
@@ -95,15 +112,28 @@ function initLobbyListeners() {
 	});
 
 	$('#submit-lobby').on('click', function() {
-		createLobby($('#lobby-name').val(), parseInt($('#field-width').val()), parseInt($('#field-height').val()));
-		$('#create-modal').css('display', 'none');
-		sendAjaxListeners('get', '/lobbies', '#content', initLobbyListeners);
+		if ($('#fixed-size').prop('checked') && $('#lobby-name').val().length > 0) {
+			createLobbyFixed($('#lobby-name').val(),
+							parseInt($('#field-width').val()),
+							parseInt($('#field-height').val()),
+							parseInt($('#max-players').val()));
+			resetCreateLobby();
+			$('#create-modal').css('display', 'none');
+			sendAjaxListeners('get', '/lobbies', '#content', initLobbyListeners);
+		} else if ($('#lobby-name').val().length > 0) {
+			createLobby($('#lobby-name').val());
+			resetCreateLobby();
+			$('#create-modal').css('display', 'none');
+			sendAjaxListeners('get', '/lobbies', '#content', initLobbyListeners);
+		} else {
+			alert('You must minimally enter a lobby name');
+		}
 	});
 }
 
 function logout() {
-	reset();
 	sendLogout();
+	reset();
 	sendAjaxListeners('get', '/lobbies', '#content', initLobbyListeners);
 
 }
@@ -111,10 +141,18 @@ function logout() {
 function login(name) {
 	if (name.length > 0) {
 		sendLogin(name);
+		$('#login-name').val('');
 		$('#player-name').text(name);
 		$('#login-modal').css('display', 'none');
 		sendAjaxListeners('get', '/lobbies', '#content', initLobbyListeners);
 	}
+}
+
+function resetCreateLobby() {
+	$('#lobby-name').val('');
+	$('#field-width').val(10);
+	$('#field-height').val(10);
+	$('#max-players').val(1);
 }
 
 function loadLobbies(event) {
@@ -192,3 +230,10 @@ function setEventListeners() {
 		login($('#login-name').val());
 	});
 };
+
+function adjustHidden(item) {
+	if ($(item).prop('checked'))
+		$('.on-fixed').css('visibility', 'visible');
+	else
+		$('.on-fixed').css('visibility', 'hidden');
+}

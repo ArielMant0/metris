@@ -136,30 +136,59 @@ footer p {
 }
 
 .lobby-list {
-    list-style: none;
-}
-
-#score-container {
-    display: flex;
-    justify-content: center;
-    overflow: auto;
-}
-
-.score-list {
-    margin-top: 50px;
     color: black;
     width: 100%;
 }
 
-.score-entry {
-    margin-right: 0;
-    display: flex;
-    justify-content: space-between;
+.lobby-entry-container {
+    display: grid;
+    grid-template-columns: 33% 33% 33%;
+    background-color: #D4D4D4;
+    border-radius: 25px;
+    padding: 10px;
+    margin: 5px;
 }
 
-.score-entry > span {
-    margin-right: 15px;
+.lobby-entry {
+    margin-left: 20px;
+    height: 50px;
+    line-height: 50px;
+    vertical-align: middle;
+}
+
+.lobby-entry-container#lobby-desc {
+    display: grid;
+    grid-template-columns: 33% 33% 33%;
+    background-color: white;
+    font-weight:  bold;
+}
+
+#lobby-desc > .lobby-entry {
+    height: 10px;
+    line-height: 10px;
+    vertical-align: middle;
+}
+
+#lobby-actions, .lobby-button-container {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.score-list {
+    padding-top: 20px;
+    color: black;
+    width: 100%;
+    display: grid;
+    grid-template-columns: 25% 25% 25% 25%;
+}
+
+.score-desc {
     font-weight: bold;
+    margin-bottom: 15px;
+}
+
+.score-entry {
+    margin-left: 20px;
 }
 
 #nav-list {
@@ -213,16 +242,6 @@ footer p {
 
 .nonspec:hover {
     background-color: #429B22;
-}
-
-.lobby-entry {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background-color: #D4D4D4;
-    border-radius: 25px;
-    padding: 10px;
-    margin: 5px;
 }
 
 #create-lobby {
