@@ -283,7 +283,7 @@ module.exports.room = function() {
     }
 
     this.getUserID = function(username) {
-        return this.players.findIndex(function(item, index array) {
+        return this.players.findIndex(function(item, index, array) {
             return item.name === this;
         }, username);
     }
