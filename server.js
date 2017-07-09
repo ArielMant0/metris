@@ -42,13 +42,13 @@ app.get('/', function (req, res) {
 });
 
 // Lobbies
-app.get('/lobbies', function (req, res) {
+app.get('/lobbies', sortLobbies, function (req, res) {
     // Render lobbies.pug
-    res.render('lobbies', { lobbies: getLobbies() });
+    res.render('lobbies', { lobbies: req.lobbies });
 });
 
 // Highscores
-app.get('/highscores', function (req, res) {
+app.get('/highscores', sortScores, function (req, res) {
     // Render highscores.pug
     res.render('highscores', { scores: scores });
 });
@@ -90,7 +90,7 @@ function createScoreTable() {
         db.run('CREATE TABLE IF NOT EXISTS highscores' +
             '(name TEXT PRIMARY KEY NOT NULL,' +
             ' score INT NOT NULL,' +
-            ' date TEXT NOT NULL,' +
+            ' date INTEGER NOT NULL,' +
             ' game TEXT NOT NULL)', [], function(error, rows) {
         if (error)
             console.log('Creating highscores table failed: ' + error);
@@ -107,22 +107,45 @@ function updateScoreTable(name, score, game) {
 
     db.serialize(function() {
         db.run('INSERT OR REPLACE INTO highscores (name, score, date, game) VALUES ($n, $s, $d, $g)',
-            { $n: name, $s: currentScore, $d: new Date().toUTCString(), $g: game }, function(error) {
+            { $n: name, $s: currentScore, $d: new Date().toDateString(), $g: game }, function(error) {
             if (error)
                 console.log('Setting new user score failed: ' + "[" + name + ", " + score + "]\n" + error);
         });
     });
 }
 
-// Create a list of all highscores
-function updateHighscores() {
-    db.serialize(function() {
-        db.all('SELECT * FROM highscores ORDER BY score DESC', [], function(error, rows) {
-            if (!error && rows.length > 0)
-                scores = rows.slice(0);
-            else if (error)
-                console.log('Getting highscores failed: ' + error);
-        });
+function sortLobbies(req, res, next) {
+    var sort = parseInt(req.query.sort);
+    var order = parseInt(req.query.order) === 0 ? -1 : 1;
+    req.lobbies = getLobbies();
+    req.lobbies.sort(function(a, b) {
+        switch(sort) {
+            case 1: return sortBy(a.name, b.name * order); break;
+            case 2: return sortBy(a.currentPlayers, b.currentPlayers * order); break;
+            case 3: return sortBy(a.maxPlayers, b.maxPlayers * order); break;
+            default: return sortBy(a.id, b.id * order);
+        }
+    });
+    next();
+}
+
+function sortScores(req, res, next) {
+    var by;
+    switch (parseInt(req.query.sort)) {
+        case 1: by = 'LOWER(name)'; break;
+        case 2: by = 'LOWER(game)'; break;
+        case 3: by = 'DATE(date)'; break;
+        default: by = 'score'; break;
+    }
+    var ascd = parseInt(req.query.order) === 1 ? ' ASC' : ' DESC';
+
+    db.all('SELECT * FROM highscores ORDER BY ' + by + ascd, [], function(error, rows) {
+        if (!error && rows.length > 0) {
+            scores = rows.slice(0);
+        } else if (error) {
+            console.log('Getting highscores failed: ' + error);
+        }
+        next();
     });
 }
 
@@ -248,6 +271,7 @@ function setEventHandlers() {
                             console.log('Client could not leave his current game!');
                     });
                     game.removeUser(id);
+                    io.sockets.in(game.name).emit('sethashes', game.getAllHashes());
                 }
                 users.delete(username);
                 socket.emit('loggedout');
@@ -260,7 +284,10 @@ function setEventHandlers() {
                 oldgame = roomlist.get(data.oldlobby);
                 newgame = roomlist.get(data.newlobby);
 
-                socket.leave(oldgame.name);
+                socket.leave(oldgame.name, function(err) {
+                    if (err)
+                        console.log('Client could not leave his current game!');
+                });
                 oldgame.removeUser(data.userid);
 
                 if (newgame.addUser(data.username)) {
@@ -296,7 +323,16 @@ function setEventHandlers() {
                         if (err)
                             console.log('Client could not leave his current game!');
                     });
-                    game.removeUser(id);
+                    var result = game.removeUser(id);
+                    if (result === 2) {
+                        io.sockets.in(game.name).emit('resizefield', game.field_width,
+                                                                     game.field_height,
+                                                                     sendFieldData(game.field),
+                                                                     sendPlayerData(game.stones));
+                    }
+
+                    io.sockets.in(game.name).emit('sethashes', game.getAllHashes());
+
                     users.set(user, '');
                     socket.emit('leftgame');
                 }
@@ -322,7 +358,9 @@ function setEventHandlers() {
 
                         if (result == 2) {
                             socket.broadcast.to(game.name).emit('resizefield', game.field_width,
-                                                game.field_height, sendFieldData(game.field), sendPlayerData(game.stones));
+                                                                               game.field_height,
+                                                                               sendFieldData(game.field),
+                                                                               sendPlayerData(game.stones));
                         }
 
                         // If the game already started tell the player about it
@@ -381,18 +419,32 @@ function setEventHandlers() {
         });
 
         socket.on('endspectate', function(lobbyname) {
-            socket.leave(lobbyname);
+            socket.leave(lobbyname, function(err) {
+                if (err)
+                    console.log('Client could not leave his current game!');
+            });
         });
 
-        socket.on('drop', function(lobbyname, userid, position) {
+        socket.on('drop', function(lobbyname, userid) {
             if (roomlist.has(lobbyname)) {
                 game = roomlist.get(lobbyname);
-                game.instaDrop(userid, position);
+                game.instaDrop(userid);
 
                 io.sockets.in(game.name).emit('movePlayers', sendPlayerData(game.stones));
+                io.sockets.in(game.name).emit('moveField', sendFieldData(game.field));
+                io.sockets.in(game.name).emit('moveScore', sendScoreData(game.score), sendLevelData(game.level));
             }
         });
     });
+}
+
+function sortBy(a, b) {
+    if (a < b)
+        return -1;
+    else if (a > b)
+        return 1;
+    else
+        return 0;
 }
 
 function setLastError(num, arg) {
@@ -415,22 +467,20 @@ function checkDelete(lobby) {
         roomlist.delete(lobby);
 }
 
-function endGame(lobby, players, score, leave=false) {
+function endGame(lobby, players, score) {
     if (loops.has(lobby)) {
         clearInterval(loops.get(lobby).short);
         clearInterval(loops.get(lobby).long);
     }
 
-    if (!leave) {
-        io.sockets.in(lobby).emit('gameover', score);
+    io.sockets.in(lobby).emit('gameover', score);
 
-        // Update scores if greater than 0
-        if (score > 0) {
-            for (i = 0; i < players.length; i++) {
-                updateScoreTable(players[i].name, score, lobby);
-            }
-            updateHighscores();
+    // Update scores if greater than 0
+    if (score > 0) {
+        for (i = 0; i < players.length; i++) {
+            updateScoreTable(players[i].name, score, lobby);
         }
+        //updateHighscores();
     }
 
     // TODO display dialog to ask if game should be restarted
@@ -592,7 +642,6 @@ console.log('Server is running on port: ' + port);
 
 // Init database
 createScoreTable();
-updateHighscores();
 
 // Set all event handlers
 setEventHandlers();

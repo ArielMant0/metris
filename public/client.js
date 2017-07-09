@@ -1,9 +1,9 @@
 $(document).ready(function () {
 	setEventListeners();
-	sendAjaxListeners('get', '/lobbies', '#content', initLobbyListeners);
+	loadLobbies();
 });
 
-function sendAjax(method, url, elem) {
+function sendAjax(method, url, elem, body=undefined) {
 	var req = new XMLHttpRequest();
 	req.addEventListener('load', function() {
 		document.querySelector(elem).innerHTML = this.responseText;
@@ -16,7 +16,7 @@ function sendAjax(method, url, elem) {
 		req.send(body);
 }
 
-function sendAjaxListeners(method, url, elem, func) {
+function sendAjaxListeners(method, url, elem, func, body=undefined) {
 	var req = new XMLHttpRequest();
 	req.addEventListener('load', function() {
 		document.querySelector(elem).innerHTML = this.responseText;
@@ -30,6 +30,13 @@ function sendAjaxListeners(method, url, elem, func) {
 		req.send(body);
 }
 
+function initHighscoreListeners() {
+	$('#score-sort-button').on('click', function() {
+		loadHighscores({ data: { sort: parseInt($('#scores-sort').val()),
+							  	 order: parseInt($('#order-sort').val()) }});
+	});
+}
+
 function initLobbyListeners() {
 	$('#content').innerHeight($('body').innerHeight() - $('footer').outerHeight() - $('#topnav').outerHeight());
 
@@ -39,6 +46,11 @@ function initLobbyListeners() {
 			watchAsSpectator(lobbyname);
 			loadGame({ data: { gameID: lobbyname }});
 		});
+	});
+
+	$('#lobby-sort-button').on('click', function() {
+		loadLobbies({ data: { sort: parseInt($('#lobbies-sort').val()),
+							  order: parseInt($('#order-sort').val()) }});
 	});
 
 	if (isLoggedIn()) {
@@ -112,6 +124,7 @@ function initLobbyListeners() {
 	$('#submit-lobby').on('click', function() {
 		if ($('#fixed-size').prop('checked') && $('#lobby-name').val().length > 0) {
 			createLobbyFixed($('#lobby-name').val(),
+							parseInt($('#lobby-background').val()),
 							parseInt($('#field-width').val()),
 							parseInt($('#field-height').val()),
 							parseInt($('#max-players').val()));
@@ -119,7 +132,7 @@ function initLobbyListeners() {
 			$('#create-modal').css('display', 'none');
 			sendAjaxListeners('get', '/lobbies', '#content', initLobbyListeners);
 		} else if ($('#lobby-name').val().length > 0) {
-			createLobby($('#lobby-name').val());
+			createLobby($('#lobby-name').val(), parseInt($('#lobby-background').val()));
 			resetCreateLobby();
 			$('#create-modal').css('display', 'none');
 			sendAjaxListeners('get', '/lobbies', '#content', initLobbyListeners);
@@ -154,24 +167,57 @@ function resetCreateLobby() {
 }
 
 function loadLobbies(event) {
-	sendAjaxListeners('get', '/lobbies', '#content', initLobbyListeners);
+	var sort;
+	var order;
+	if (!event) {
+		sort = 0;
+		order = 1;
+	} else {
+		sort = event.data.sort;
+		order = event.data.order;
+	}
+
+	sendAjaxListeners('get', '/lobbies' + '?sort=' + sort + "&order=" + order,
+					  '#content', initLobbyListeners);
+	checkGameTab();
 }
 
 function loadHighscores(event) {
-	sendAjax('get', '/highscores', '#content');
+	var sort;
+	var order;
+	if (!event) {
+		sort = 0;
+		order = 0;
+	} else {
+		sort = event.data.sort;
+		order = event.data.order;
+	}
+
+	sendAjaxListeners('get', '/highscores' + '?sort=' + sort + "&order=" + order,
+					  '#content', initHighscoreListeners);
+	checkGameTab();
 }
 
 function loadControls(event) {
 	sendAjax('get', '/controls', '#content');
+	checkGameTab();
 }
 
 function loadGame(event) {
 	sendAjaxListeners('get', '/game/' + event.data.gameID, '#content', startgame);
+	checkGameTab();
 }
 
 function lobbyForm(event) {
 	$('#create-modal').css('display', 'block');
 	$('#lobby-name').focus();
+}
+
+function checkGameTab() {
+	if (isInGame() || spectator)
+		$('#get-game').css('visibility', 'visible');
+	else
+		$('#get-game').css('visibility', 'hidden');
 }
 
 // To be called when a lobby wants to be joined by a non-identified user
@@ -184,35 +230,19 @@ function joinForm(event) {
 function setEventListeners() {
 
     $('#get-lobbies').on('click', function() {
-	    $(this).addClass('active');
-    	$('#get-scores').removeClass('class');
-    	$('#get-game').removeClass('class');
-    	$('#get-controls').removeClass('class');
     	loadLobbies();
     });
 
     $('#get-scores').on('click', function() {
-	    $(this).addClass('active');
-    	$('#get-lobbies').removeClass('class');
-    	$('#get-game').removeClass('class');
-    	$('#get-controls').removeClass('class');
     	loadHighscores();
     });
 
     $('#get-controls').on('click', function() {
-	    $(this).addClass('active');
-    	$('#get-lobbies').removeClass('class');
-    	$('#get-game').removeClass('class');
-    	$('#get-scores').removeClass('class');
     	loadControls();
     });
 
     $('#get-game').on('click', function() {
-    	if (isLoggedIn() && isInGame()) {
-	    	$(this).addClass('active');
-	    	$('#get-scores').removeClass('class');
-	    	$('#get-lobbies').removeClass('class');
-	    	$('#get-controls').removeClass('class');
+    	if (isInGame() || spectator) {
 	    	loadGame({ data: { gameID: gameInfo.lobby }});
 	    } else {
 	    	alert("You need to be logged in and inside a lobby to play!");

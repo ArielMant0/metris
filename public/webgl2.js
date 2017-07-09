@@ -25,11 +25,13 @@ var cubeImageGreen;
 var cubeImageSpace;
 var cubeImageBorder;
 var frameImage;
+var gridImage;
 
 var cubeGreen;
 var spaceBackground;
 var cubeBorder;
 var frame;
+var grid;
 
 var perspectiveMatrix;
 var mvMatrix;
@@ -37,6 +39,9 @@ var mvMatrix;
 // -- Initialize data
 var NUM_INSTANCES = 1000;
 var currentSourceIdx = 0;
+
+var rotatateAll = 0.0;
+var plz_rotateAll = false;
 
 // -- Init Vertex Array
 var OFFSET_LOCATION = 0;
@@ -57,8 +62,10 @@ var instanceOffsets;
 var instanceRotations;
 var instanceColors;
 
-var curScene = 0;
-var vertexArrayMaps;
+var curScene = [];
+var vertexArrayMaps = [];
+
+var SOLID_STONE = 26;
 
 var colors = [];
 var players = [];
@@ -72,7 +79,8 @@ var gameInfo = {
     username: '',
     score: 0,
     paused: false,
-    stone_drop: [-1, -1, -1, -1]
+    stone_drop: [-1, -1, -1, -1],
+    background: 0
 };
 
 var audio;
@@ -82,12 +90,13 @@ var level = 1;
 var readBinary = false;
 var gameRunning = false;
 var spectator = false;
+var resetBuffer = false;
 
 $(document).ready(function () {
     // WebSocket
     socket = io();
     // Main music for the game
-    audio = new Audio('MUSIC.mp3');
+    audio = new Audio('assets/MUSIC.mp3');
 
     audio.onended = function () {
       audio.currentTime = 7;
@@ -97,7 +106,7 @@ $(document).ready(function () {
     reset();
 
     socket.on('music', function () {
-        var audio2 = new Audio('MUSIC2.mp3');
+        var audio2 = new Audio('assets/MUSIC2.mp3');
         audio2.play();
     });
 
@@ -135,8 +144,10 @@ $(document).ready(function () {
         } else {
             if (score != gameInfo.score)
                 updateScore(score);
-            if (lvl != level)
+            if (lvl != level) {
+                resetBuffer = true;
                 updateLevel(lvl);
+            }
         }
     });
 
@@ -166,10 +177,6 @@ $(document).ready(function () {
             gameInfo.field = field;
             players = stones;
         }
-    });
-
-    socket.on('leaveroom', function() {
-        socket.emit('leave', gameInfo.lobby, gameInfo.userid, gameInfo.username);
     });
 
     socket.on('leftgame', function() {
@@ -246,6 +253,10 @@ $(document).ready(function () {
         audio.pause();
     });
 
+    $('#get-controls').on('click', function () {
+        audio.pause();
+    });
+
     $(document).keydown(function (e) {
         // A, E, Q, D, S
         if (!spectator && gameRunning && (e.which == 65 || e.which == 69 || e.which == 81 || e.which == 68 || e.which == 83))
@@ -260,10 +271,13 @@ $(document).ready(function () {
 });
 
 function instaDrop() {
-    socket.emit('drop', gameInfo.lobby, gameInfo.userid, gameInfo.stone_drop);
+    socket.emit('drop', gameInfo.lobby, gameInfo.userid);
 }
 
 function watchAsSpectator(lobbyname) {
+    if (isInGame())
+        leaveGame();
+
     spectator = true;
     socket.emit('spectate', lobbyname);
 }
@@ -338,22 +352,24 @@ function updateDropStone() {
     }
 }
 
-function createLobbyFixed(lobby, fwidth, fheight, maxplayers) {
+function createLobbyFixed(lobby, bg, fwidth, fheight, maxplayers) {
     if (gameInfo.username) {
         if (spectator) {
             socket.emit('endspectate', gameInfo.lobby);
             reset();
         }
+        gameInfo.background = bg;
         socket.emit('createlobbyfixed', lobby, gameInfo.username, fwidth, fheight, maxplayers);
     }
 }
 
-function createLobby(lobby) {
+function createLobby(lobby, bg) {
     if (gameInfo.username) {
         if (spectator) {
             socket.emit('endspectate', gameInfo.lobby);
             reset();
         }
+        gameInfo.background = bg;
         socket.emit('createlobby', lobby, gameInfo.username);
     }
 }
@@ -370,7 +386,7 @@ function isInGame() {
     return !spectator && gameInfo.lobby.length > 0;
 }
 
-function reset(killfield=true) {
+function reset(killmusic=true) {
     $('#player-name').css('color', 'white');
     gameInfo.lobby = '';
     gameInfo.userid = -1;
@@ -378,16 +394,17 @@ function reset(killfield=true) {
     gameInfo.field_height = 0;
     gameInfo.score = 0;
     gameInfo.paused = false;
+    gameInfo.background = 0;
     gameInfo.stone_drop = [-1, -1, -1, -1];
     gameRunning = false;
     level = 1;
     players = [];
     spectator = false;
+    gameInfo.field = [];
 
-    if (killfield) {
+    if (killmusic) {
         audio.pause();
         audio.currentTime = 0;
-        gameInfo.field = [];
     }
 }
 
@@ -459,7 +476,10 @@ function start() {
 
         initParticleSystem();
 
-        initModels();
+        initModel("/assets/backplane.gltf", 0);
+        initModel("/assets/border.gltf", 1);
+        initModel("/assets/borderedge.gltf", 2);
+        initModel("/assets/backplane.gltf", 3);
 
         render();
     }
@@ -774,7 +794,7 @@ function initTextures() {
     cubeGreen = gl.createTexture();
     cubeImageGreen = new Image();
     cubeImageGreen.onload = function () { handleTextureLoaded(cubeImageGreen, cubeGreen); }
-    cubeImageGreen.src = "assets/cubegreen.png";
+    cubeImageGreen.src = "assets/cubegray.png";
 
     spaceBackground = gl.createTexture();
     cubeImageSpace = new Image();
@@ -790,6 +810,11 @@ function initTextures() {
     frameImage = new Image();
     frameImage.onload = function () { handleTextureLoaded(frameImage, frame); }
     frameImage.src = "assets/frame.png";
+
+    grid = gl.createTexture();
+    gridImage = new Image();
+    gridImage.onload = function () { handleTextureLoaded(gridImage, grid); }
+    gridImage.src = "assets/grid.png";
 }
 
 function handleTextureLoaded(image, texture) {
@@ -801,21 +826,20 @@ function handleTextureLoaded(image, texture) {
     gl.bindTexture(gl.TEXTURE_2D, null);
 }
 
-function initModels() {
+function initModel(gltfUrl, index) {
 
     // -- Load gltf
-    var gltfUrl = "/assets/border.gltf";
     var glTFLoader = new MinimalGLTFLoader.glTFLoader();
 
     glTFLoader.loadGLTF(gltfUrl, function(glTF) {
 
-        curScene = glTF.scenes[glTF.defaultScene];
+        curScene[index] = glTF.scenes[glTF.defaultScene];
 
         // -- Initialize vertex array
         var POSITION_LOCATION = 0; // set with GLSL layout qualifier
         var NORMAL_LOCATION = 1; // set with GLSL layout qualifier
         var TEXCOORD_LOCATION = 2;
-        vertexArrayMaps = {};
+        vertexArrayMaps[index] = {};
 
         // var in loop
         var mesh;
@@ -825,10 +849,10 @@ function initModels() {
         var vertexArray2;
         var i, len;
 
-        for (var mid in curScene.meshes) {
+        for (var mid in curScene[index].meshes) {
 
-            mesh = curScene.meshes[mid];
-            vertexArrayMaps[mid] = [];
+            mesh = curScene[index].meshes[mid];
+            vertexArrayMaps[index][mid] = [];
 
             for (i = 0, len = mesh.primitives.length; i < len; ++i) {
 
@@ -840,7 +864,7 @@ function initModels() {
 
                 // WebGL2: create vertexArray
                 vertexArray2 = gl.createVertexArray();
-                vertexArrayMaps[mid].push(vertexArray2);
+                vertexArrayMaps[index][mid].push(vertexArray2);
 
                 // -- Initialize buffer
                 var vertices2 = primitive.vertexBuffer;
@@ -880,8 +904,6 @@ function initModels() {
 
                 gl.enableVertexAttribArray(NORMAL_LOCATION);
 
-
-
                 var texcoordInfo = primitive.attributes.TEXCOORD_0;
 
                 gl.vertexAttribPointer(
@@ -894,9 +916,6 @@ function initModels() {
                     );
 
                 gl.enableVertexAttribArray(TEXCOORD_LOCATION);
-
-
-
 
                 gl.bindBuffer(gl.ARRAY_BUFFER, null);
                 gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indicesBuffer2);
@@ -1003,7 +1022,7 @@ function initParticleSystem() {
     }
 }
 
-function resetBuffer() {
+function resetBuffers() {
     for (var i = 0; i < NUM_INSTANCES; ++i) {
         var oi = i * 2;
         var ri = i;
@@ -1016,7 +1035,7 @@ function resetBuffer() {
         instanceRotations[i] = i / (NUM_INSTANCES / 2.0) * 2.0 * Math.PI;
 
 
-        if (level === 1) {
+        if (level % 4 === 1) {
             if (i < NUM_INSTANCES / 2) {
                 instanceOffsets[oi] = 0.0;
                 instanceOffsets[oi + 1] = 0.0;
@@ -1024,13 +1043,13 @@ function resetBuffer() {
                 instanceOffsets[oi] = 0.675 * Math.cos(instanceRotations[i - NUM_INSTANCES / 2]);
                 instanceOffsets[oi + 1] = 0.675 * Math.sin(instanceRotations[i - NUM_INSTANCES / 2]);
             }
-        } else if (level == 2) {
+        } else if (level % 4 === 2) {
             instanceOffsets[oi] = 0.0;
             instanceOffsets[oi + 1] = 0.0;
-        } else if (level == 3) {
+        } else if (level % 4 === 3) {
             instanceOffsets[oi] = Math.random() * Math.cos(instanceRotations[i - NUM_INSTANCES / 2]);
             instanceOffsets[oi + 1] = Math.random() * Math.sin(instanceRotations[i - NUM_INSTANCES / 2]);
-        } else if (level == 4) {
+        } else if (level % 4 === 0) {
             instanceRotations[i] = (3.0/2.0) * Math.PI;
 
             instanceOffsets[oi] = Math.random() * 2.0 - 1.0;
@@ -1039,6 +1058,8 @@ function resetBuffer() {
     }
 
     for (var va = 0; va < vertexArrays.length; ++va) {
+        gl.bindVertexArray(vertexArrays[va]);
+
         vertexBuffers[va][OFFSET_LOCATION] = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffers[va][OFFSET_LOCATION]);
         gl.bufferData(gl.ARRAY_BUFFER, instanceOffsets, gl.STREAM_COPY);
@@ -1082,8 +1103,6 @@ function initParticleSystem2() {
         gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, transformFeedbacks[va]);
         gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 0, vertexBuffers[va][OFFSET_LOCATION]);
         gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 1, vertexBuffers[va][ROTATION_LOCATION]);
-
-
 
         gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, null);
 
@@ -1138,6 +1157,9 @@ function transform() {
 }
 
 function render() {
+    if (plz_rotateAll)
+        rotatateAll +=0.004;
+
     // Set the viewport
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
@@ -1180,75 +1202,27 @@ function render() {
 
 
     ///////////////////////////////////////
-    // Background
-    ///////////////////////////////////////
-    gl.disable(gl.DEPTH_TEST);
-
-    gl.activeTexture(gl.TEXTURE2);
-    gl.bindTexture(gl.TEXTURE_2D, spaceBackground);
-
-    translate = vec3.create();
-    vec3.set(translate, 0, 0, -0.15);
-
-    mvMatrix = mat4.create();
-    mat4.translate(mvMatrix, mvMatrix, translate);
-
-    gl.uniform1i(gl.getUniformLocation(programs[PROGRAM_STONE], "uSampler"), 2);
-
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeVerticesIndexBuffer);
-    setMatrixUniforms();
-    gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
-
-    gl.enable(gl.DEPTH_TEST);
-
-
-    ///////////////////////////////////////
-    // ParticleSystem
-    ///////////////////////////////////////
-    initParticleSystem2();
-
-    // Rotate/Move triangles
-    transform();
-
-    gl.bindVertexArray(vertexArrays[currentSourceIdx]);
-
-    // Attributes per-instance when drawing sets back to 1 when drawing instances
-    gl.vertexAttribDivisor(OFFSET_LOCATION, 1);
-    gl.vertexAttribDivisor(ROTATION_LOCATION, 1);
-
-    gl.useProgram(programs[PROGRAM_DRAW]);
-
-    // Enable blending
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-
-    // Set uniforms
-    var time = Date.now();
-    gl.uniform1f(drawTimeLocation, time);
-    gl.uniform1i(gl.getUniformLocation(programs[PROGRAM_DRAW], "uSampler"), 2);
-
-    gl.drawArraysInstanced(gl.TRIANGLES, 0, 3, NUM_INSTANCES);
-
-    gl.disable(gl.BLEND);
-
-    // DAS IST ALLES SO DUMM !!!
-    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 0, null);
-    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 1, null);
-
-    gl.bindVertexArray(null);
-
-    ///////////////////////////////////////
     // Models
     ///////////////////////////////////////
     var a = gameInfo.field_width / screenaspect > gameInfo.field_height ? gameInfo.field_width / screenaspect + (gameInfo.field_width / screenaspect * 0.1) : gameInfo.field_height + (gameInfo.field_height * 0.1);
     var trans = (a / Math.sin(Math.PI / 8)) * Math.sin(Math.PI / 4 + Math.PI / 8);
 
+    if (plz_rotateAll)
+        trans *= (1 + Math.abs(Math.sin(rotatateAll)));
+
     var uniformMVLocations = gl.getUniformLocation(programs[PROGRAM_MODEL], "uMVMatrix");
     var uniformMvNormalLocations = gl.getUniformLocation(programs[PROGRAM_MODEL], "mvNormal");
     var uniformPLocations = gl.getUniformLocation(programs[PROGRAM_MODEL], "uPMatrix");
+    var uniformLightLocations = gl.getUniformLocation(programs[PROGRAM_MODEL], "uLight");
+
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, spaceBackground);
 
     gl.activeTexture(gl.TEXTURE3);
     gl.bindTexture(gl.TEXTURE_2D, frame);
+
+    gl.activeTexture(gl.TEXTURE5);
+    gl.bindTexture(gl.TEXTURE_2D, grid);
 
     gl.useProgram(programs[PROGRAM_MODEL]);
 
@@ -1259,70 +1233,152 @@ function render() {
     var rotatationY = Math.PI / 2.0;
 
     var localMV;
-    var localMVP;
     var localMVNormal;
     var modelView;
     var scale;
     var translate;
+    var mesh;
+    var scale_b = 1.0;
+    var scale_h = 1.0;
+    var max = curScene.length;
 
-    for (h = 0; h < 4; h++) {
-        localMV = mat4.create();
-        localMVP = mat4.create();
-        localMVNormal = mat4.create();
+    for (g = 0; g < max; g++) {
+        if (gameInfo.field_width === 0 && gameInfo.field_height === 0)
+            max = 0;
 
-        translate = vec3.create();
-        if (h === 0)
-            vec3.set(translate, gameInfo.field_width + 1, 0, -trans);
-        else if (h === 1)
-            vec3.set(translate, -gameInfo.field_width - 1, 0, -trans);
-        else if (h === 2)
-            vec3.set(translate, 0, gameInfo.field_height + 1, -trans);
-        else if (h === 3)
-            vec3.set(translate, 0, -gameInfo.field_height - 1, -trans);
+        if (g === 3 && gameInfo.background == 0)
+            continue;
 
-        scale = vec3.create();
-        var scale_r;
-        if (h === 0 || h === 1)
-            scale_r = gameInfo.field_height / 10.0; // breite, tiefe, höhe
-        else
-            scale_r = gameInfo.field_width / 10.0;
-        vec3.set(scale, 1.0, 1.0, scale_r);
+        var count = 4;
+        if (g === 0) {
+            count = 1;
+            gl.disable(gl.DEPTH_TEST);
+        } else if (g === 3 && gameInfo.background === 1) {
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+            gl.disable(gl.DEPTH_TEST);
+        }
 
-        modelView = mat4.create();
+        for (h = 0; h < count && typeof curScene[g] !== 'undefined'; h++) {
+            localMV = mat4.create();
+            localMVNormal = mat4.create();
 
-        mat4.translate(modelView, modelView, translate);
+            translate = vec3.create();
+            scale = vec3.create();
+            if (g === 0) {
+                var tmp = screenaspect > 2.1 ? -8 + screenaspect/1.3 : -10;
 
-        //mat4.rotateZ(modelView, modelView, rotatationY);
-        mat4.rotateX(modelView, modelView, rotatationY);
-        if (h === 2 || h === 3)
-            mat4.rotateY(modelView, modelView, rotatationY);
+                vec3.set(translate, 0, -3, tmp);
 
-        mat4.scale(modelView, modelView, scale);
+                vec3.set(scale, 10, 9, 1.0);
+                scale_b = 1.0;
+            } else if (g === 1) {
+                if (h === 0)
+                    vec3.set(translate, gameInfo.field_width + 1, 0, -trans);
+                else if (h === 1)
+                    vec3.set(translate, -gameInfo.field_width - 1, 0, -trans);
+                else if (h === 2)
+                    vec3.set(translate, 0, gameInfo.field_height + 1, -trans);
+                else if (h === 3)
+                    vec3.set(translate, 0, -gameInfo.field_height - 1, -trans);
 
-        for (var mid in curScene.meshes) {
-            mesh = curScene.meshes[mid];
+                if (h === 0 || h === 1)
+                    scale_b = gameInfo.field_height / 10.0; // breite, tiefe, höhe
+                else
+                    scale_b = gameInfo.field_width / 10.0;
+                vec3.set(scale, 1.0, 1.0, scale_b);
+            } else if (g === 2) {
+                if (h === 0)
+                    vec3.set(translate, gameInfo.field_width + 1, -gameInfo.field_height - 1, -trans);
+                else if (h === 1)
+                    vec3.set(translate, gameInfo.field_width + 1, gameInfo.field_height + 1, -trans);
+                else if (h === 2)
+                    vec3.set(translate, -gameInfo.field_width - 1, gameInfo.field_height + 1, -trans);
+                else if (h === 3)
+                    vec3.set(translate, -gameInfo.field_width - 1, -gameInfo.field_height - 1, -trans);
 
-            for (i = 0, len = mesh.primitives.length; i < len; ++i) {
-                primitive = mesh.primitives[i];
+                vec3.set(scale, 1.0, 1.0, 1.0);
+                scale_b = 1.0;
+            } else {
+                vec3.set(translate, 0, 0, -trans-1.2);
 
-                mat4.multiply(localMV, modelView, primitive.matrix);
-
-                mat4.invert(localMVNormal, localMV);
-                mat4.transpose(localMVNormal, localMVNormal);
-
-                gl.bindVertexArray(vertexArrayMaps[mid][i]);
-
-                gl.uniformMatrix4fv(uniformMVLocations, false, localMV);
-                gl.uniformMatrix4fv(uniformMvNormalLocations, false, localMVNormal);
-                gl.uniformMatrix4fv(uniformPLocations, false, perspectiveMatrix);
-                gl.uniform1i(gl.getUniformLocation(programs[PROGRAM_MODEL], "uSampler"), 3);
-
-                gl.uniform1fv(gl.getUniformLocation(programs[PROGRAM_MODEL], "scale"), [scale_r]);
-
-                gl.drawElements(primitive.mode, primitive.indices.length, primitive.indicesComponentType, 0);
-
-                gl.bindVertexArray(null);
+                vec3.set(scale, gameInfo.field_width, gameInfo.field_height, 1.0);
+                if (gameInfo.background === 1) {
+                    scale_b = gameInfo.field_height;
+                    scale_h = gameInfo.field_width;
+                } else {
+                    scale_b = gameInfo.field_height / 10.0;
+                    scale_h = gameInfo.field_width / 10.0;
+                }
             }
+
+            modelView = mat4.create();
+
+            if (g > 0)
+                mat4.rotateZ(modelView, modelView, rotatateAll);
+
+            mat4.translate(modelView, modelView, translate);
+
+            //mat4.rotateZ(modelView, modelView, rotatationY);
+            if (g === 1) {
+                mat4.rotateX(modelView, modelView, rotatationY);
+                if (h === 2 || h === 3)
+                    mat4.rotateY(modelView, modelView, rotatationY);
+            } else if (g === 2) {
+                mat4.rotateX(modelView, modelView, rotatationY);
+                mat4.rotateY(modelView, modelView, rotatationY * h);
+            }
+
+            mat4.scale(modelView, modelView, scale);
+
+            for (var mid in curScene[g].meshes) {
+                mesh = curScene[g].meshes[mid];
+
+                for (i = 0, len = mesh.primitives.length; i < len; ++i) {
+                    primitive = mesh.primitives[i];
+
+                    mat4.multiply(localMV, modelView, primitive.matrix);
+
+                    mat4.invert(localMVNormal, localMV);
+                    mat4.transpose(localMVNormal, localMVNormal);
+
+                    gl.bindVertexArray(vertexArrayMaps[g][mid][i]);
+
+                    gl.uniformMatrix4fv(uniformMVLocations, false, localMV);
+                    gl.uniformMatrix4fv(uniformMvNormalLocations, false, localMVNormal);
+                    gl.uniformMatrix4fv(uniformPLocations, false, perspectiveMatrix);
+
+                    if (g === 0)
+                        gl.uniform4fv(uniformLightLocations, [0.0, 0.0, 1.0, 0.4]);
+                    else if (g === 1 || g === 2)
+                        gl.uniform4fv(uniformLightLocations, [0.0, 0.0, -trans*2.0 + 10, 3.0]);
+                    else if (g === 3)
+                        gl.uniform4fv(uniformLightLocations, [0.0, 0.0, -10.0, 1.0]);
+
+                    if (g === 0)
+                        gl.uniform1i(gl.getUniformLocation(programs[PROGRAM_MODEL], "uSampler"), 2);
+                    else if (g === 3) {
+                        if (gameInfo.background === 1)
+                            gl.uniform1i(gl.getUniformLocation(programs[PROGRAM_MODEL], "uSampler"), 5);
+                        else if (gameInfo.background === 2)
+                            gl.uniform1i(gl.getUniformLocation(programs[PROGRAM_MODEL], "uSampler"), 3);
+                    }
+                    else
+                        gl.uniform1i(gl.getUniformLocation(programs[PROGRAM_MODEL], "uSampler"), 3);
+
+                    gl.uniform2fv(gl.getUniformLocation(programs[PROGRAM_MODEL], "scale"), [scale_h, scale_b]);
+
+                    gl.drawElements(primitive.mode, primitive.indices.length, primitive.indicesComponentType, 0);
+
+                    gl.bindVertexArray(null);
+                }
+            }
+        }
+        if (g === 0)
+            gl.enable(gl.DEPTH_TEST);
+        else if (g === 3 && gameInfo.background === 1) {
+            gl.disable(gl.BLEND);
+            gl.enable(gl.DEPTH_TEST);
         }
     }
 
@@ -1362,27 +1418,35 @@ function render() {
         for (d1 = gameInfo.field_height-1; d1 >= 0 && empty < gameInfo.field_width; d1--) {
             empty = 0;
             for (d2 = gameInfo.field_width-1; d2 >= 0; d2--) {
-                if (gameInfo.field[d1 * gameInfo.field_width + d2] > 0) { //&& gameInfo.field[d1 * gameInfo.field_width + d2] < 5) {
-
-                    empty++;
+                if (gameInfo.field[d1 * gameInfo.field_width + d2] > 0) {
 
                     translate = vec3.create();
                     vec3.set(translate, d2 * 2 - gameInfo.field_width + 1, gameInfo.field_height - d1 * 2 - 1, -trans);
 
                     mvMatrix = mat4.create();
+                    mat4.rotateZ(mvMatrix, mvMatrix, rotatateAll);
                     mat4.translate(mvMatrix, mvMatrix, translate);
 
                     // Specify the texture to map onto the faces.
                     gl.uniform1i(gl.getUniformLocation(programs[PROGRAM_STONE], "uSampler"), 1);
-                    gl.uniform3fv(gl.getUniformLocation(programs[PROGRAM_STONE], "uColor"), [colors[gameInfo.field[d1 * gameInfo.field_width + d2]-1].r,
-                                                                                             colors[gameInfo.field[d1 * gameInfo.field_width + d2]-1].g,
-                                                                                             colors[gameInfo.field[d1 * gameInfo.field_width + d2]-1].b]);
+
+                    var useColor;
+                    if (gameInfo.field[d1 * gameInfo.field_width + d2] === SOLID_STONE) {
+                        useColor = [0, 0, 0];
+                    } else {
+                        useColor = [colors[gameInfo.field[d1 * gameInfo.field_width + d2]-1].r,
+                                    colors[gameInfo.field[d1 * gameInfo.field_width + d2]-1].g,
+                                    colors[gameInfo.field[d1 * gameInfo.field_width + d2]-1].b];
+                    }
+                    gl.uniform3fv(gl.getUniformLocation(programs[PROGRAM_STONE], "uColor"), useColor);
 
                     // Draw the cube.
                     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeVerticesIndexBuffer);
                     setMatrixUniforms();
 
                     gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
+                } else {
+                    empty++;
                 }
             }
         }
@@ -1400,6 +1464,7 @@ function render() {
                         -trans);
 
                     mvMatrix = mat4.create();
+                    mat4.rotateZ(mvMatrix, mvMatrix, rotatateAll);
                     mat4.translate(mvMatrix, mvMatrix, translate);
 
                     // Specify the texture to map onto the faces.
@@ -1432,6 +1497,7 @@ function render() {
                     -trans);
 
                 mvMatrix = mat4.create();
+                mat4.rotateZ(mvMatrix, mvMatrix, rotatateAll);
                 mat4.translate(mvMatrix, mvMatrix, translate);
 
                 gl.uniform1i(gl.getUniformLocation(programs[PROGRAM_STONE], "uSampler"), 4);
@@ -1447,7 +1513,49 @@ function render() {
             }
         }
     }
+    //gl.disable(gl.BLEND);
+
+
+    ///////////////////////////////////////
+    // ParticleSystem
+    ///////////////////////////////////////
+    if (resetBuffer) {
+        resetBuffers();
+        resetBuffer = false;
+    }
+
+    initParticleSystem2();
+
+    // Rotate/Move triangles
+    transform();
+
+    gl.bindVertexArray(vertexArrays[currentSourceIdx]);
+
+    // Attributes per-instance when drawing sets back to 1 when drawing instances
+    gl.vertexAttribDivisor(OFFSET_LOCATION, 1);
+    gl.vertexAttribDivisor(ROTATION_LOCATION, 1);
+
+    gl.useProgram(programs[PROGRAM_DRAW]);
+
+    // Enable blending
+    // gl.enable(gl.BLEND);
+    // gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+
+    // Set uniforms
+    var time = Date.now();
+    gl.uniform1f(drawTimeLocation, time);
+    gl.uniform1i(gl.getUniformLocation(programs[PROGRAM_DRAW], "uSampler"), 2);
+
+    gl.drawArraysInstanced(gl.TRIANGLES, 0, 3, NUM_INSTANCES);
+
     gl.disable(gl.BLEND);
+
+    // DAS IST ALLES SO DUMM !!!
+    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 0, null);
+    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 1, null);
+
+    gl.bindVertexArray(null);
+
 
     requestAnimationFrame(render);
 }

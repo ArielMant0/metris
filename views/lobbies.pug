@@ -1,28 +1,44 @@
-button(id='create-lobby') Create Lobby
+div(class='top-buttons')
+    button(id='create-lobby') Create Lobby
+    div(class='sort-by', id='sort-by-lobbies')
+        select(id='lobbies-sort')
+            option(value='0') ID
+            option(value='1') Name
+            option(value='2') Current Players
+            option(value='3') Max Players
+        select(id='order-sort')
+            option(value='1') Ascending
+            option(value='0') Descending
+        button(type='submit', id='lobby-sort-button') Sort
 
 div(class='modal', id='create-modal')
     div(class='modal-content')
         span(class='close' id='close-create-modal') &times;
-        span(class='create-entry')
+        div(class='create-entry')
             label(for='lobby-name') Lobby Name
             input(type='text', id='lobby-name', required)
-        span(class='create-entry')
-            label(for='fixed-size') Fixed Size
+        div(class='create-entry')
+            label(for='lobby-background') Background
+            select(id='lobby-background')
+                option(value='0') None
+                option(value='1') Transparent Grid
+                option(value='2') Solid Wood
+        div(class='create-entry')
+            label(for='fixed-size') Fixed Parameters
             input(type='checkbox', id='fixed-size')
-        span(class='create-entry on-fixed')
+        div(class='create-entry on-fixed')
             label(for='max-players') Max Players
             label(for='max-players', id='max-players-desc') 1
             input(type='range', id='max-players', min='1', max='25', step='1', value='1')
-        span(class='create-entry on-fixed')
+        div(class='create-entry on-fixed')
             label(for='field-width') Field Width
             label(for='field-width', id='field-width-desc') 10
             input(type='range', id='field-width', min='10', max='100', step='10', value='10')
-        span(class='create-entry on-fixed')
+        div(class='create-entry on-fixed')
             label(for='field-height') Field Height
             label(for='field-height', id='field-height-desc') 10
             input(type='range', id='field-height', min='10', max='100', step='10', value='10')
         button(type='submit', id='submit-lobby') Create
-
 
 div(class='lobby-list')
     div(class='lobby-entry-container' id='lobby-desc')

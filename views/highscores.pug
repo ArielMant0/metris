@@ -1,5 +1,16 @@
 - var i = 1;
 
+div(class='top-buttons' id='one-button')
+    div(class='sort-by', id='sort-by-scores')
+        select(id='scores-sort')
+            option(value='0') Score
+            option(value='1') Player
+            option(value='2') Game Name
+            option(value='3') Date
+        select(id='order-sort')
+            option(value='0') Descending
+            option(value='1') Ascending
+        button(type='submit', id='score-sort-button') Sort
 div(class='score-list')
     div(class='score-entry score-desc') Player
     div(class='score-entry score-desc') Score

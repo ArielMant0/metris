@@ -96,7 +96,6 @@ footer p {
     font-weight: bold;
 }
 
-.active,
 .close:hover,
 .close:focus {
     color: black;
@@ -244,7 +243,7 @@ footer p {
     background-color: #429B22;
 }
 
-#create-lobby {
+#create-lobby, #lobby-sort-button, #score-sort-button {
     border-radius: 25px;
     margin-top: 5px;
     background-color: #82BCD1;
@@ -261,4 +260,18 @@ footer p {
 
 #login-button:hover {
     background-color: #6794A5;
+}
+
+.top-buttons {
+    display: flex;
+    justify-content: space-between;
+}
+
+.sort-by > select, .sort-by > button {
+    margin-right: 5px;
+}
+
+#one-button {
+    display: flex;
+    justify-content: flex-end;
 }
