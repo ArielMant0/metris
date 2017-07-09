@@ -179,7 +179,6 @@ module.exports.room = function() {
             // TODO resize field according to player count
             console.log("Player \'" + user + "\' joined the game \'" + this.name + "\'");
             this.growField();
-            console.log('Resizing field: ' + this.field_width + 'x' + this.field_height);
             this.players.push(new this.player(this.players.length, user, status));
             this.stones.push(new this.stone(this.players.length));
             this.spawnStone(this.stones.length-1);
@@ -284,20 +283,19 @@ module.exports.room = function() {
     }
 
     this.getUserID = function(username) {
-        if (id >= 0 && id < this.players.length) {
-            for (i = 0; i < this.players.length; i++) {
-                if (this.players[i].name === username)
-                    return i;
-            }
-        }
+        return this.players.findIndex(function(item, index array) {
+            return item.name === this;
+        }, username);
     }
 
+    // Increase field size and transfer old data + update all players
     this.growField = function() {
         this.paused = true;
         this.maxPlayers++;
-
+        // Store old field size to be able to adjust players
         var oldWidth = this.field_width;
         var oldHeight = this.field_height;
+        // Compute new field size
         var newWidth = oldWidth + (2 * PLAYER_OFFSET);
         var newHeight = newWidth + PLAYER_OFFSET > oldHeight ? newWidth + PLAYER_OFFSET : oldHeight;
 
@@ -307,12 +305,14 @@ module.exports.room = function() {
         this.paused = false;
     }
 
+    // Increase field size and transfer old data + update all players
     this.shrinkField = function() {
         this.paused = true;
         this.maxPlayers--;
-
+        // Store old field size to be able to adjust players
         var oldWidth = this.field_width;
         var oldHeight = this.field_height;
+        // Compute new field size
         var newWidth = oldWidth - PLAYER_OFFSET > MIN_WIDTH ? oldWidth - PLAYER_OFFSET : MIN_WIDTH;
         var newHeight = oldHeight - Math.floor(PLAYER_OFFSET/2) > MIN_HEIGHT ? oldHeight - Math.floor(PLAYER_OFFSET/2) : MIN_HEIGHT;
 
@@ -321,55 +321,88 @@ module.exports.room = function() {
         this.paused = false;
     }
 
+    // Transfer old field data to new larger/smaller field
     this.adjustField = function(width, height, limitV, limitH, shrink) {
         var newField =  new Array(width * height);
         newField.fill(0);
 
+        // Clear list of rows holding immortal stones
         if (shrink)
             this.solids.clear();
 
         var stop = false;
+        // Difference in height between new and old field
         var diff = shrink ? 0 : Math.abs(height - this.field_height);
+        // Starting from the bottom of the old field when the new field is bigger
+        // or the bottom of the new field when the new field is smaller: copy data
         for (i = limitV; i >= 0 && !stop; i--) {
             var empty = 0;
+            // Check all fields of the current row
             for (j = 0; j < limitH; j++) {
+                // If we are shrinking and there is an immortal stone in this row
+                // add its row to the list of rows holding immortal stones
                 if (shrink && this.field[(i * this.field_width) + j] === SOLID_STONE) {
                     this.solids.add(i);
-                } else if (this.field[(i * this.field_width) + j] > 0) {
+                }
+                // If the field is not empty or holds an immortal and we are NOT
+                // shrinking, then we copy this field
+                else if (this.field[(i * this.field_width) + j] > 0) {
                     newField[((i + diff) * width) + j] = this.field[(i * this.field_width) + j];
-                } else {
+                }
+                // If the field is empty increment the optimization counter
+                else {
                     empty++
+                    // If we find an empty row we can stop, there
+                    // can be no other static stones above this row
                     if (empty == this.field_width)
                         stop = true;
                 }
             }
         }
+        // Set new width and height
         this.field_width = width;
         this.field_height = height;
 
         return newField;
     }
 
+    // Reposition playerstones to fit the new field
     this.adjustPlayers = function(width, height, shrink) {
+        // Difference between old and new field width
         var diff = Math.abs(width - this.field_width);
         for (i = 0; i < this.stones.length; i++) {
             var cancel = false;
             var setStatic = false;
+            // Check all single stones
             for (j = 0; j < 4 && !cancel && this.stones[i].pos[j] != -1; j++) {
+                // Compute the row this stone was in in the old field
                 row = Math.floor(this.stones[i].pos[j] / width);
                 if (shrink) {
+                    // If we are shrinking and the stone is in the
+                    // last row of our new field, mark it as static
                     if (row === this.field_height-1) {
                         setStatic = true;
-                    } else if (row > this.field_height-1) {
+                    }
+                    // If the stone is further down than our new
+                    // field's height is, spawn a new stone for
+                    // this player and go to the next stone
+                    else if (row > this.field_height-1) {
                         this.spawnStone(i);
+                        setStatic = false;
                         cancel = true;
-                    } else {
+                    }
+                    // Reposition the stone (upwards) by the width difference
+                    else {
                         this.stones[i].pos[j] -= (row * diff);
                     }
-                } else {
+                }
+                // If we are not shrinking all stones can fit the field
+                // and we just reposition the stone (downwards) by the width difference
+                else {
                     this.stones[i].pos[j] += (row * diff);
                 }
             }
+            // If this stone is marked as static set it down
             if (setStatic) {
                 this.setStaticStone(i);
                 this.stonefinished(i);
@@ -377,23 +410,31 @@ module.exports.room = function() {
         }
     }
 
+    // Called when stone of user width id 'userid' reached
+    // the current bottom of the field
+    // Checks whether any rows need to be deleted
     this.stonefinished = function(userid) {
         var stop = false;
+        // From bottom to top check all rows
         for (i = this.field_height-1; i >= 0 && !stop; i--) {
+            // Count of empty fields in this row
             var empty = 0;
+            // Count of filled fields in this row
             var full = 0;
             for (j = this.field_width-1; j >= 0; j--) {
-                // Delete full row and spawn new stone
+                // If there is a filled field and there is no
+                // immortal stone in this row
                 if (this.field[i * this.field_width + j] > 0 && !this.solids.has(i)) {
                     full++;
+                    // When the whole row is full
                     if (full === this.field_width) {
-                        this.updateScoreLevel();
                         var change = false;
                         for (k = 0; k < i; k++) {
                             var emptyRow = 0;
-                            // If there is no undestroyable stone is in this row, destroy it
+                            // If there is no immortal stone is in this row, destroy it
                             if (!this.solids.has(i-k)) {
                                 change = true;
+                                this.updateScoreLevel();
                                 for (l = 0; l < this.field_width; l++) {
                                     emptyRow += this.field[(i - k - 1) * this.field_width + l];
                                     this.field[(i - k) * this.field_width + l] = this.field[(i - k - 1) * this.field_width + l];
@@ -403,18 +444,26 @@ module.exports.room = function() {
                                     k = i;
                             }
                         }
+                        // If a row was deleted the row index must not change
+                        // because the our current row is now one of the former above rows
                         i = change ? i + 1 : i;
                     }
-                } else if (this.field[i * this.field_width + j] === 0) {
+                }
+                // If the field is empty
+                else if (this.field[i * this.field_width + j] === 0) {
                     empty++;
+                    // When there are empty and filled fields in this row
+                    // we can skip this row, it cannot be deleted, but there
+                    // may be other above of it that can
                     if (full > 0)
                         j = -1;
+                    // If we found a completely empty row we can stop checking
                     else if (empty === this.field_width)
                         stop = true;
                 }
             }
         }
-
+        // Spawn a new stone for the user with id 'userid'
         this.spawnStone(userid);
     }
 

@@ -448,7 +448,6 @@ function endGame(lobby, players, score) {
         for (i = 0; i < players.length; i++) {
             updateScoreTable(players[i].name, score, lobby);
         }
-        //updateHighscores();
     }
 
     // TODO display dialog to ask if game should be restarted
@@ -503,7 +502,6 @@ function setLoops(game) {
 }
 
 function sendFieldData(field) {
-    //var field = OptimizeField(data);
     if (useBinary)
         return sendBinaryField(field);
     else
@@ -559,11 +557,6 @@ function sendBinaryScore(score) {
     var bufView = new Uint16Array(bufArr);
     bufView[0] = score;
     return bufArr;
-}
-
-function OptimizeField(field) {
-    // TODO implement
-    return field;
 }
 
 function createDefaultGame(name, w, h, m) {
