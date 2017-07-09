@@ -1,3 +1,6 @@
+var currentSort = 0;
+var currentOrder = 1;
+
 $(document).ready(function () {
 	setEventListeners();
 	loadLobbies();
@@ -35,6 +38,16 @@ function initHighscoreListeners() {
 		loadHighscores({ data: { sort: parseInt($('#scores-sort').val()),
 							  	 order: parseInt($('#order-sort').val()) }});
 	});
+
+	$("#scores-sort > option").each(function() {
+		$(this).prop('selected', false);
+	});
+	$("#scores-sort > option[value="+currentSort+"]").prop('selected', true);
+
+	$("#order-sort > option").each(function() {
+		$(this).prop('selected', false);
+	});
+	$("#order-sort > option[value="+currentOrder+"]").prop('selected', true);
 }
 
 function initLobbyListeners() {
@@ -52,6 +65,16 @@ function initLobbyListeners() {
 		loadLobbies({ data: { sort: parseInt($('#lobbies-sort').val()),
 							  order: parseInt($('#order-sort').val()) }});
 	});
+
+	$("#lobbies-sort > option").each(function() {
+		$(this).prop('selected', false);
+	});
+	$("#lobbies-sort > option[value="+currentSort+"]").prop('selected', true);
+
+	$("#order-sort > option").each(function() {
+		$(this).prop('selected', false);
+	});
+	$("#order-sort > option[value="+currentOrder+"]").prop('selected', true);
 
 	if (isLoggedIn()) {
 		$('.lobby-button').each(function() {
@@ -167,33 +190,29 @@ function resetCreateLobby() {
 }
 
 function loadLobbies(event) {
-	var sort;
-	var order;
 	if (!event) {
-		sort = 0;
-		order = 1;
+		currentSort = 0;
+		currentOrder = 1;
 	} else {
-		sort = event.data.sort;
-		order = event.data.order;
+		currentSort = event.data.sort;
+		currentOrder = event.data.order;
 	}
 
-	sendAjaxListeners('get', '/lobbies' + '?sort=' + sort + "&order=" + order,
+	sendAjaxListeners('get', '/lobbies' + '?sort=' + currentSort + "&order=" + currentOrder,
 					  '#content', initLobbyListeners);
 	checkGameTab();
 }
 
 function loadHighscores(event) {
-	var sort;
-	var order;
 	if (!event) {
-		sort = 0;
-		order = 0;
+		currentSort = 0;
+		currentOrder = 0;
 	} else {
-		sort = event.data.sort;
-		order = event.data.order;
+		currentSort = event.data.sort;
+		currentOrder = event.data.order;
 	}
-
-	sendAjaxListeners('get', '/highscores' + '?sort=' + sort + "&order=" + order,
+	console.log('highscore ' + currentOrder + ', ' + currentSort);
+	sendAjaxListeners('get', '/highscores' + '?sort=' + currentSort + "&order=" + currentOrder,
 					  '#content', initHighscoreListeners);
 	checkGameTab();
 }

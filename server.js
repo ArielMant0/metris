@@ -137,7 +137,11 @@ function sortScores(req, res, next) {
         case 3: by = 'DATE(date)'; break;
         default: by = 'score'; break;
     }
-    var ascd = parseInt(req.query.order) === 1 ? ' ASC' : ' DESC';
+    var ord = parseInt(req.query.sort)
+    if (ord === 1 || ord === 2) {
+        ord = Math.abs(parseInt(req.query.order)-1);
+    }
+    var ascd = ord === 1 ? ' ASC' : ' DESC';
 
     db.all('SELECT * FROM highscores ORDER BY ' + by + ascd, [], function(error, rows) {
         if (!error && rows.length > 0) {
@@ -276,42 +280,6 @@ function setEventHandlers() {
                 users.delete(username);
                 socket.emit('loggedout');
                 console.log("Player \'" + username + "\' logged out");
-            }
-        });
-
-        socket.on('leavejoin', function(data) {
-            if (roomlist.has(data.oldlobby) && roomlist.has(data.newlobby)) {
-                oldgame = roomlist.get(data.oldlobby);
-                newgame = roomlist.get(data.newlobby);
-
-                socket.leave(oldgame.name, function(err) {
-                    if (err)
-                        console.log('Client could not leave his current game!');
-                });
-                oldgame.removeUser(data.userid);
-
-                if (newgame.addUser(data.username)) {
-                    socket.join(newgame.name, function() {
-                        users.set(data.username, newgame.name);
-                        uId = newgame.getLastUser();
-                        // Tell the player its game info
-                        socket.emit('setgameinfo', { lobbyname: newgame.name, id: uId,
-                                width: newgame.field_width, height: newgame.field_height,
-                                username: data.username, hash: newgame.players[uId].hash });
-
-                        socket.broadcast.to(newgame.name).emit('userhashes', uId, newgame.players[uId].hash);
-                        socket.emit('sethashes', newgame.getAllHashes());
-
-                        // If the game already started tell the player about it
-                        if (newgame.gameStarted && !newgame.gameOver)
-                            socket.emit('begin', sendFieldData(newgame.field));
-
-                        socket.emit('showGame');
-                    });
-                } else {
-                    users.set(data.username, '');
-                    socket.emit('leftgame');
-                }
             }
         });
 
