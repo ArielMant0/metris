@@ -261,12 +261,14 @@ $(document).ready(function () {
         // A, E, Q, D, S
         if (!spectator && gameRunning && (e.which == 65 || e.which == 69 || e.which == 81 || e.which == 68 || e.which == 83))
             submitmove(e.which, gameInfo.userid);
-        else if (gameRunning && e.which == 27) // Escape
+        else if (gameRunning && e.which === 27) // Escape
             closeLobby();
-        else if (gameRunning && e.which == 32) // Space
+        else if (gameRunning && e.which === 32) // Space
             instaDrop()
-        else if (gameRunning && e.which == 80) // P
+        else if (gameRunning && e.which === 80) // P
             pauseLobby();
+        else if (gameRunning && e.which === 82) // R
+            plz_rotateAll = !plz_rotateAll;
     });
 });
 
