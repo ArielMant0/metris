@@ -429,12 +429,12 @@ module.exports.room = function() {
                     // When the whole row is full
                     if (full === this.field_width) {
                         var change = false;
+                        this.updateScoreLevel();
                         for (k = 0; k < i; k++) {
                             var emptyRow = 0;
                             // If there is no immortal stone is in this row, destroy it
                             if (!this.solids.has(i-k)) {
                                 change = true;
-                                this.updateScoreLevel();
                                 for (l = 0; l < this.field_width; l++) {
                                     emptyRow += this.field[(i - k - 1) * this.field_width + l];
                                     this.field[(i - k) * this.field_width + l] = this.field[(i - k - 1) * this.field_width + l];
