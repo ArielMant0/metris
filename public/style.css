@@ -23,7 +23,7 @@ footer p {
     justify-content: space-around;
     align-items: center;
     align-content: center;
-    margin-top: 7.5%;
+    padding-top: 7.5%;
 }
 
 #game-pause, #game-over {

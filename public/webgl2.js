@@ -327,6 +327,9 @@ function updateLevel(newLevel) {
 }
 
 function updateDropStone() {
+    // Speichere welche Positionen gestet werden muessen
+    // Dabei koennen Positionen die eine "Position" unter sich haben
+    // oder -1 sind uebersprungen werden
     var tmp = [true, true, true, true]
     var found = false;
     for (i = 0; i < 4; i++) {
@@ -336,11 +339,15 @@ function updateDropStone() {
         }
     }
 
+    // Gehe alle Positions des aktuellen Steins des Nutzers durch
     for (k = 0; k < 4; k++) {
         if (tmp[k] === true) {
+            // Teste alle Felder darunter, wobei nur bis 0 (also zur negativen Höhe des Spielers) getestet werden muss
             var max_h = gameInfo.field_height - Math.floor(players[gameInfo.userid][k] / gameInfo.field_width)
             for (l = 0; l < max_h; l++) {
+                                // Wenn am Feld unter dem aktuellen Index ein Stein liegt, setze die Vorschau auf den Index
                 if (gameInfo.field[players[gameInfo.userid][k] + (l + 1) * gameInfo.field_width] > 0 || l === max_h - 1) {
+                                        // Wenn schon eine Lösung vorhanden, teste ob der Wert kleiner ist
                     if (!found || players[gameInfo.userid][0] + l * gameInfo.field_width < gameInfo.stone_drop[0]) {
                         gameInfo.stone_drop = [players[gameInfo.userid][0] + l * gameInfo.field_width,
                                                players[gameInfo.userid][1] + l * gameInfo.field_width,
@@ -459,7 +466,8 @@ function startgame() {
 function start() {
     'use strict';
 
-    initWebGL();      // Initialize the GL context
+    // Initialize the GL context
+    initWebGL();
 
     // Only continue if WebGL is available and working
     if (gl) {
@@ -478,6 +486,9 @@ function start() {
 
         initParticleSystem();
 
+        // Lade alle Modelle
+        // Es koennen beliebig viele Modelle eingeladen werden
+        // der Index gibt die Location an, mit der darauf zugegriffen werden kann
         initModel("/assets/backplane.gltf", 0);
         initModel("/assets/border.gltf", 1);
         initModel("/assets/borderedge.gltf", 2);
@@ -498,6 +509,7 @@ function initWebGL() {
         //    gl = canvas.getContext("experimental-webgl");
         //}
 
+        // Reagiere auf Skylierung des Canvas
         window.addEventListener('resize', resizeCanvas, false);
 
         gl.canvas.addEventListener("webglcontextlost", function (event) {
@@ -531,6 +543,7 @@ function initPrograms() {
         return shader;
     }
 
+    // Erzeuge die Shader die für das Particle-Movement zuständig sind
     var vshaderTransform = createShader(gl, getShaderSource('vs-emit'), gl.VERTEX_SHADER);
     var fshaderTransform = createShader(gl, getShaderSource('fs-emit'), gl.FRAGMENT_SHADER);
 
@@ -555,13 +568,16 @@ function initPrograms() {
         console.log(log);
     }
 
-    // Setup program for draw shader
+    // Erzeuge das Program zum ParticleSystem zeichnen
     var programPartDraw = createProgram(gl, getShaderSource('vs-draw'), getShaderSource('fs-draw'));
 
+    // Erzeuge das Program zum Steine zeichnen
     var programStone = createProgram(gl, getShaderSource('stone-vs'), getShaderSource('stone-fs'));
 
+    // Erzeuge das Program zum Models zeichnen
     var programModel = createProgram(gl, getShaderSource('model-vs'), getShaderSource('model-fs'));
 
+    // Stecke die Programme in ein Array
     programs = [programPartTransform, programPartDraw, programStone, programModel];
 
     gl.useProgram(programs[PROGRAM_STONE]);
@@ -838,8 +854,9 @@ function initModel(gltfUrl, index) {
         curScene[index] = glTF.scenes[glTF.defaultScene];
 
         // -- Initialize vertex array
-        var POSITION_LOCATION = 0; // set with GLSL layout qualifier
-        var NORMAL_LOCATION = 1; // set with GLSL layout qualifier
+        // set with GLSL layout qualifier
+        var POSITION_LOCATION = 0;
+        var NORMAL_LOCATION = 1;
         var TEXCOORD_LOCATION = 2;
         vertexArrayMaps[index] = {};
 
@@ -1037,6 +1054,7 @@ function resetBuffers() {
         instanceRotations[i] = i / (NUM_INSTANCES / 2.0) * 2.0 * Math.PI;
 
 
+        // ParticleSystem in two Cycles from Center
         if (level % 4 === 1) {
             if (i < NUM_INSTANCES / 2) {
                 instanceOffsets[oi] = 0.0;
@@ -1045,13 +1063,19 @@ function resetBuffers() {
                 instanceOffsets[oi] = 0.675 * Math.cos(instanceRotations[i - NUM_INSTANCES / 2]);
                 instanceOffsets[oi + 1] = 0.675 * Math.sin(instanceRotations[i - NUM_INSTANCES / 2]);
             }
-        } else if (level % 4 === 2) {
+        }
+        // ParticleSystem in one Cycle from Center
+        else if (level % 4 === 2) {
             instanceOffsets[oi] = 0.0;
             instanceOffsets[oi + 1] = 0.0;
-        } else if (level % 4 === 3) {
+        }
+        // ParticleSystem filled area from Center
+        else if (level % 4 === 3) {
             instanceOffsets[oi] = Math.random() * Math.cos(instanceRotations[i - NUM_INSTANCES / 2]);
             instanceOffsets[oi + 1] = Math.random() * Math.sin(instanceRotations[i - NUM_INSTANCES / 2]);
-        } else if (level % 4 === 0) {
+        }
+        // ParticleSystem rain from top
+        else if (level % 4 === 0) {
             instanceRotations[i] = (3.0/2.0) * Math.PI;
 
             instanceOffsets[oi] = Math.random() * 2.0 - 1.0;
@@ -1159,6 +1183,7 @@ function transform() {
 }
 
 function render() {
+    // Erhöhe die Rotation wenn gewollt
     if (plz_rotateAll)
         rotatateAll +=0.004;
 
@@ -1171,9 +1196,9 @@ function render() {
 
 
     // Establish the perspective with which we want to view the
-    // scene. Our field of view is 45 degrees, with a width/height
-    // ratio of 640:480, and we only want to see objects between 0.1 units
-    // and 100 units away from the camera.
+    // scene. Our field of view is 45 degrees, with a dynamic width/height
+    // ratio, and we only want to see objects between 0.1 units
+    // and 1000 units away from the camera.
     var screenaspect = window.innerWidth / window.innerHeight;
 
     perspectiveMatrix = mat4.create();
@@ -1206,17 +1231,21 @@ function render() {
     ///////////////////////////////////////
     // Models
     ///////////////////////////////////////
+    // Berechne die Entfernung der Objekte zur Kamera
     var a = gameInfo.field_width / screenaspect > gameInfo.field_height ? gameInfo.field_width / screenaspect + (gameInfo.field_width / screenaspect * 0.1) : gameInfo.field_height + (gameInfo.field_height * 0.1);
     var trans = (a / Math.sin(Math.PI / 8)) * Math.sin(Math.PI / 4 + Math.PI / 8);
 
+    // Entscheide ob alles rotiert wird
     if (plz_rotateAll)
         trans *= (1 + Math.abs(Math.sin(rotatateAll)));
 
+    // Speiche die Uniform locations um später darin etwas an den Shader zu übergeben
     var uniformMVLocations = gl.getUniformLocation(programs[PROGRAM_MODEL], "uMVMatrix");
     var uniformMvNormalLocations = gl.getUniformLocation(programs[PROGRAM_MODEL], "mvNormal");
     var uniformPLocations = gl.getUniformLocation(programs[PROGRAM_MODEL], "uPMatrix");
     var uniformLightLocations = gl.getUniformLocation(programs[PROGRAM_MODEL], "uLight");
 
+    // Aktiviere Texturen
     gl.activeTexture(gl.TEXTURE2);
     gl.bindTexture(gl.TEXTURE_2D, spaceBackground);
 
@@ -1226,12 +1255,14 @@ function render() {
     gl.activeTexture(gl.TEXTURE5);
     gl.bindTexture(gl.TEXTURE_2D, grid);
 
+    // Nutze das Model Zeichen Program
     gl.useProgram(programs[PROGRAM_MODEL]);
 
     // -- Render preparation
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
 
+    // Konstante Rotation um die Objekte an die richtige Stelle zu bekommen
     var rotatationY = Math.PI / 2.0;
 
     var localMV;
@@ -1244,10 +1275,13 @@ function render() {
     var scale_h = 1.0;
     var max = curScene.length;
 
+    // Gehe alle Modells durch
     for (g = 0; g < max; g++) {
+        // Wenn das Spiel zuende ist, rendere nur den Hintergrund
         if (gameInfo.field_width === 0 && gameInfo.field_height === 0)
             max = 0;
 
+        // Wenn kein Brett-Hintergrund gerendert werden soll
         if (g === 3 && gameInfo.background == 0)
             continue;
 
@@ -1255,16 +1289,22 @@ function render() {
         if (g === 0) {
             count = 1;
             gl.disable(gl.DEPTH_TEST);
-        } else if (g === 3 && gameInfo.background === 1) {
+        }
+        // Starte Blending da der Brett-Hintergrund durchsichtig sein soll
+        else if (g === 3 && gameInfo.background === 1) {
             gl.enable(gl.BLEND);
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
             gl.disable(gl.DEPTH_TEST);
         }
 
         for (h = 0; h < count && typeof curScene[g] !== 'undefined'; h++) {
+
+            // Erzeuge die Matrizen
             localMV = mat4.create();
             localMVNormal = mat4.create();
 
+            // Setze die Matrizen abhängig vom Objekt-Type
+            // Background
             translate = vec3.create();
             scale = vec3.create();
             if (g === 0) {
@@ -1274,7 +1314,9 @@ function render() {
 
                 vec3.set(scale, 10, 9, 1.0);
                 scale_b = 1.0;
-            } else if (g === 1) {
+            }
+            // Field-Border
+            else if (g === 1) {
                 if (h === 0)
                     vec3.set(translate, gameInfo.field_width + 1, 0, -trans);
                 else if (h === 1)
@@ -1289,7 +1331,9 @@ function render() {
                 else
                     scale_b = gameInfo.field_width / 10.0;
                 vec3.set(scale, 1.0, 1.0, scale_b);
-            } else if (g === 2) {
+            }
+            // Field-Edges
+            else if (g === 2) {
                 if (h === 0)
                     vec3.set(translate, gameInfo.field_width + 1, -gameInfo.field_height - 1, -trans);
                 else if (h === 1)
@@ -1301,7 +1345,9 @@ function render() {
 
                 vec3.set(scale, 1.0, 1.0, 1.0);
                 scale_b = 1.0;
-            } else {
+            }
+            // Field-Background
+            else {
                 vec3.set(translate, 0, 0, -trans-1.2);
 
                 vec3.set(scale, gameInfo.field_width, gameInfo.field_height, 1.0);
@@ -1316,6 +1362,7 @@ function render() {
 
             modelView = mat4.create();
 
+            // Rotiere alle Objekte mit rotateAll
             if (g > 0)
                 mat4.rotateZ(modelView, modelView, rotatateAll);
 
@@ -1331,6 +1378,7 @@ function render() {
                 mat4.rotateY(modelView, modelView, rotatationY * h);
             }
 
+            // Erzeuge eine Skalier Matrix
             mat4.scale(modelView, modelView, scale);
 
             for (var mid in curScene[g].meshes) {
@@ -1339,6 +1387,7 @@ function render() {
                 for (i = 0, len = mesh.primitives.length; i < len; ++i) {
                     primitive = mesh.primitives[i];
 
+                    // Verrechne die Matizen
                     mat4.multiply(localMV, modelView, primitive.matrix);
 
                     mat4.invert(localMVNormal, localMV);
@@ -1346,10 +1395,12 @@ function render() {
 
                     gl.bindVertexArray(vertexArrayMaps[g][mid][i]);
 
+                    // Setze die Matrizen
                     gl.uniformMatrix4fv(uniformMVLocations, false, localMV);
                     gl.uniformMatrix4fv(uniformMvNormalLocations, false, localMVNormal);
                     gl.uniformMatrix4fv(uniformPLocations, false, perspectiveMatrix);
 
+                    // Entscheide welche Light-Position uebergeben werden soll
                     if (g === 0)
                         gl.uniform4fv(uniformLightLocations, [0.0, 0.0, 1.0, 0.4]);
                     else if (g === 1 || g === 2)
@@ -1357,6 +1408,7 @@ function render() {
                     else if (g === 3)
                         gl.uniform4fv(uniformLightLocations, [0.0, 0.0, -10.0, 1.0]);
 
+                    // Entscheide welche Textur uebergeben werden soll
                     if (g === 0)
                         gl.uniform1i(gl.getUniformLocation(programs[PROGRAM_MODEL], "uSampler"), 2);
                     else if (g === 3) {
@@ -1368,14 +1420,18 @@ function render() {
                     else
                         gl.uniform1i(gl.getUniformLocation(programs[PROGRAM_MODEL], "uSampler"), 3);
 
+                    // Schicke dem Shader wie sehr die Textur-Koordinaten skaliert werden sollen
                     gl.uniform2fv(gl.getUniformLocation(programs[PROGRAM_MODEL], "scale"), [scale_h, scale_b]);
 
+                    // Zeichne
                     gl.drawElements(primitive.mode, primitive.indices.length, primitive.indicesComponentType, 0);
 
+                    // Reset
                     gl.bindVertexArray(null);
                 }
             }
         }
+        // Disable Einstellungen
         if (g === 0)
             gl.enable(gl.DEPTH_TEST);
         else if (g === 3 && gameInfo.background === 1) {
@@ -1388,8 +1444,10 @@ function render() {
     ///////////////////////////////////////
     // Tetrisfield
     ///////////////////////////////////////
+    // Wähle Program
     gl.useProgram(programs[PROGRAM_STONE]);
 
+    // Aktiviere Texturen
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, cubeGreen);
 
@@ -1415,23 +1473,33 @@ function render() {
     gl.enableVertexAttribArray(vertexNormalAttribute);
     gl.vertexAttribDivisor(vertexNormalAttribute, 0);
 
+    // Optimierungsvariable, wenn im field eine ganze Reihe frei war, brich ab, da darueber nichts sein kann
     var empty = 0;
+    // Wenn das Feld undefiniert ist versuche nicht zu rendern
     if (typeof gameInfo.field !== 'undefined') {
+        // Gehe das ganze feld von unten nach oben durch
         for (d1 = gameInfo.field_height-1; d1 >= 0 && empty < gameInfo.field_width; d1--) {
             empty = 0;
+            // Gehe die unterste Zeile von rechte nach links durch
             for (d2 = gameInfo.field_width-1; d2 >= 0; d2--) {
+                // Wenn an der Stelle im Feld ein Eintrag (>0) dann rendere den Stein
                 if (gameInfo.field[d1 * gameInfo.field_width + d2] > 0) {
 
+                    // Verschiebe den Stein sodass er von der Kamera gesehen wird.
                     translate = vec3.create();
                     vec3.set(translate, d2 * 2 - gameInfo.field_width + 1, gameInfo.field_height - d1 * 2 - 1, -trans);
 
+                    // Rotiere mit rotateAll
                     mvMatrix = mat4.create();
                     mat4.rotateZ(mvMatrix, mvMatrix, rotatateAll);
                     mat4.translate(mvMatrix, mvMatrix, translate);
 
-                    // Specify the texture to map onto the faces.
+                    // Wähle die Greyscale Textur aus
                     gl.uniform1i(gl.getUniformLocation(programs[PROGRAM_STONE], "uSampler"), 1);
 
+                    // Definiere die Color, die der Stein haben soll.
+                    // Ist es ein Immortal-Stone wird er schwarz gerendert.
+                    // Sonst nutze die uebergebene Spielerfarbe.
                     var useColor;
                     if (gameInfo.field[d1 * gameInfo.field_width + d2] === SOLID_STONE) {
                         useColor = [0, 0, 0];
@@ -1444,8 +1512,9 @@ function render() {
 
                     // Draw the cube.
                     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeVerticesIndexBuffer);
+                    // Setze die Matrizen fuer den Shader
                     setMatrixUniforms();
-
+                    // Zeichne
                     gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
                 } else {
                     empty++;
@@ -1454,28 +1523,36 @@ function render() {
         }
     }
 
+    // Wenn players undefined ueberspringe rendern
     if (typeof players !== 'undefined') {
+        // Gehe alle Player durch
         for (i = 0; i < players.length; i++) {
+            // Gehe jede Position des aktuellen Players durch
             for (d2 = 0; d2 < players[i].length; d2++) {
+                // Wenn die Position nicht -1 rendere
                 if (players[i][d2] >= 0) {
 
+                    // Verschiebe den Stein sodass er sichtbar ist
                     translate = vec3.create();
                     vec3.set(translate,
                         Math.floor(players[i][d2] % gameInfo.field_width) * 2 - gameInfo.field_width + 1,
                         gameInfo.field_height - Math.floor(players[i][d2] / gameInfo.field_width) * 2 - 1,
                         -trans);
 
+                    // Rotiere mithilfe von rotateAll
                     mvMatrix = mat4.create();
                     mat4.rotateZ(mvMatrix, mvMatrix, rotatateAll);
                     mat4.translate(mvMatrix, mvMatrix, translate);
 
-                    // Specify the texture to map onto the faces.
+                    // Gebe dem Shader die Textur und welche Farbe der Stein haben soll
                     gl.uniform1i(gl.getUniformLocation(programs[PROGRAM_STONE], "uSampler"), 1);
                     gl.uniform3fv(gl.getUniformLocation(programs[PROGRAM_STONE], "uColor"), [colors[i].r, colors[i].g, colors[i].b]);
 
                     // Draw the cube.
                     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeVerticesIndexBuffer);
+                    // Setze die Matrizen fuer den Shader
                     setMatrixUniforms();
+                    // Zeichne
                     gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
                 }
             }
@@ -1485,23 +1562,30 @@ function render() {
     ///////////////////////////////////////
     // gameInfo.stone_drop
     ///////////////////////////////////////
+    // Aktiviere Blending, da der Stein durchsichtig sein soll
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
 
+    // Wenn stone_drop undefined ueberspringe rendern
     if (typeof gameInfo.stone_drop !== 'undefined' && !spectator) {
+        // Gehe alle Positionen von stone_drop durch
         for (i = 0; i < gameInfo.stone_drop.length; i++) {
+            // Wenn die Position nicht -1 rendere
             if (gameInfo.stone_drop[i] >= 0) {
 
+                // Verschiebe den Stein sodass er sichtbar ist
                 translate = vec3.create();
                 vec3.set(translate,
                     Math.floor(gameInfo.stone_drop[i] % gameInfo.field_width) * 2 - gameInfo.field_width + 1,
                     gameInfo.field_height - Math.floor(gameInfo.stone_drop[i] / gameInfo.field_width) * 2 - 1,
                     -trans);
 
+                // Rotiere mithilfe von rotateAll
                 mvMatrix = mat4.create();
                 mat4.rotateZ(mvMatrix, mvMatrix, rotatateAll);
                 mat4.translate(mvMatrix, mvMatrix, translate);
 
+                // Gebe dem Shader die Textur und welche Farbe der Stein haben soll
                 gl.uniform1i(gl.getUniformLocation(programs[PROGRAM_STONE], "uSampler"), 4);
                 gl.uniform3fv(gl.getUniformLocation(programs[PROGRAM_STONE], "uColor"), [colors[gameInfo.userid].r,
                                                                                          colors[gameInfo.userid].g,
@@ -1509,8 +1593,9 @@ function render() {
 
                 // Draw the cube.
                 gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeVerticesIndexBuffer);
-
+                // Setze die Matrizen fuer den Shader
                 setMatrixUniforms();
+                // Zeichne
                 gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
             }
         }
@@ -1521,6 +1606,7 @@ function render() {
     ///////////////////////////////////////
     // ParticleSystem
     ///////////////////////////////////////
+    // Wenn sich das Level geändert hat, setze das PartikelSystem auf die neue Startposition
     if (resetBuffer) {
         resetBuffers();
         resetBuffer = false;
@@ -1537,6 +1623,7 @@ function render() {
     gl.vertexAttribDivisor(OFFSET_LOCATION, 1);
     gl.vertexAttribDivisor(ROTATION_LOCATION, 1);
 
+    // Nutze das Zeichenprogram
     gl.useProgram(programs[PROGRAM_DRAW]);
 
     // Enable blending
@@ -1548,6 +1635,7 @@ function render() {
     gl.uniform1f(drawTimeLocation, time);
     gl.uniform1i(gl.getUniformLocation(programs[PROGRAM_DRAW], "uSampler"), 2);
 
+    // Zeichne die Partikel mit Instancing
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 3, NUM_INSTANCES);
 
     gl.disable(gl.BLEND);
@@ -1559,6 +1647,7 @@ function render() {
     gl.bindVertexArray(null);
 
 
+    // Wiederhole die Render funktion
     requestAnimationFrame(render);
 }
 
@@ -1566,12 +1655,15 @@ function render() {
 // Set Matrix
 //
 function setMatrixUniforms() {
+    // Setze die Projektion Matrix
     var pUniform = gl.getUniformLocation(programs[PROGRAM_STONE], "uPMatrix");
     gl.uniformMatrix4fv(pUniform, false, perspectiveMatrix);
 
+    // Setze die View Matrix
     var mvUniform = gl.getUniformLocation(programs[PROGRAM_STONE], "uMVMatrix");
     gl.uniformMatrix4fv(mvUniform, false, mvMatrix);
 
+    // Setze die Normal Matrix
     var normalMatrix = mat4.create();
     mat4.invert(normalMatrix, mvMatrix);
     mat4.transpose(normalMatrix, normalMatrix);

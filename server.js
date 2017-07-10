@@ -120,9 +120,14 @@ function sortLobbies(req, res, next) {
     req.lobbies = getLobbies();
     req.lobbies.sort(function(a, b) {
         switch(sort) {
-            case 1: return sortBy(a.name, b.name * order); break;
+            case 1: {
+                if (order === -1)
+                    return sortBy(a.name.toLowerCase(), b.name.toLowerCase());
+                else
+                    return sortBy(b.name.toLowerCase(), a.name.toLowerCase());
+                } break;
             case 2: return sortBy(a.currentPlayers, b.currentPlayers * order); break;
-            case 3: return sortBy(a.maxPlayers, b.maxPlayers * order); break;
+            case 3: return sortBy(a.maxPlayers * order, b.maxPlayers); break;
             default: return sortBy(a.id, b.id * order);
         }
     });
@@ -134,13 +139,15 @@ function sortScores(req, res, next) {
     switch (parseInt(req.query.sort)) {
         case 1: by = 'LOWER(name)'; break;
         case 2: by = 'LOWER(game)'; break;
-        case 3: by = 'DATE(date)'; break;
+        case 3: by = 'date'; break;
         default: by = 'score'; break;
     }
     var ord = parseInt(req.query.sort)
-    if (ord === 1 || ord === 2) {
+    if (ord === 1 || ord === 2)
         ord = Math.abs(parseInt(req.query.order)-1);
-    }
+    else
+        ord = Math.abs(parseInt(req.query.order));
+
     var ascd = ord === 1 ? ' ASC' : ' DESC';
 
     db.all('SELECT * FROM highscores ORDER BY ' + by + ascd, [], function(error, rows) {

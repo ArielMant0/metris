@@ -33,7 +33,25 @@ function sendAjaxListeners(method, url, elem, func, body=undefined) {
 		req.send(body);
 }
 
+function initControlsListeners() {
+	document.title = document.title.split('-')[0] + ' - Controls';
+
+	checkGameTab();
+}
+
+function initGameListeners() {
+	document.title = document.title.split('-')[0] + ' - Game: ' + gameInfo.lobby;
+
+	checkGameTab();
+
+	startgame();
+}
+
 function initHighscoreListeners() {
+	document.title = document.title.split('-')[0] + ' - Highscores';
+
+	checkGameTab();
+
 	$('#score-sort-button').on('click', function() {
 		loadHighscores({ data: { sort: parseInt($('#scores-sort').val()),
 							  	 order: parseInt($('#order-sort').val()) }});
@@ -52,6 +70,9 @@ function initHighscoreListeners() {
 
 function initLobbyListeners() {
 	$('#content').innerHeight($('body').innerHeight() - $('footer').outerHeight() - $('#topnav').outerHeight());
+	document.title = document.title.split('-')[0] + ' - Lobbies';
+
+	checkGameTab();
 
 	$('.watch-button').each(function() {
 		$(this).on('click', function () {
@@ -200,7 +221,6 @@ function loadLobbies(event) {
 
 	sendAjaxListeners('get', '/lobbies' + '?sort=' + currentSort + "&order=" + currentOrder,
 					  '#content', initLobbyListeners);
-	checkGameTab();
 }
 
 function loadHighscores(event) {
@@ -214,17 +234,14 @@ function loadHighscores(event) {
 	console.log('highscore ' + currentOrder + ', ' + currentSort);
 	sendAjaxListeners('get', '/highscores' + '?sort=' + currentSort + "&order=" + currentOrder,
 					  '#content', initHighscoreListeners);
-	checkGameTab();
 }
 
 function loadControls(event) {
-	sendAjax('get', '/controls', '#content');
-	checkGameTab();
+	sendAjaxListeners('get', '/controls', '#content', initControlsListeners);
 }
 
 function loadGame(event) {
-	sendAjaxListeners('get', '/game/' + event.data.gameID, '#content', startgame);
-	checkGameTab();
+	sendAjaxListeners('get', '/game/' + event.data.gameID, '#content', initGameListeners);
 }
 
 function lobbyForm(event) {
