@@ -273,10 +273,10 @@ function setEventHandlers() {
             }
         });
 
-        socket.on('logout', function(username, id) {
+        socket.on('logout', function(username, id, lobbyname) {
             if (users.has(username)) {
-                if (users.get(username).length > 0) {
-                    game = roomlist.get(users.get(username));
+                if (lobbyname.length > 0 && users.get(username) === lobbyname) {
+                    game = roomlist.get(lobbyname);
                     socket.leave(game.name, function(err) {
                         if (err)
                             console.log('Client could not leave his current game!');
@@ -293,7 +293,7 @@ function setEventHandlers() {
         socket.on('leave', function(lobby, id, user) {
             if (roomlist.has(lobby) && users.has(user)) {
                 game = roomlist.get(lobby);
-                if (game.players[id].name === user) {
+                if (game.players.length > 0 && game.players[id].name === user) {
                     socket.leave(game.name, function(err) {
                         if (err)
                             console.log('Client could not leave his current game!');

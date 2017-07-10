@@ -443,7 +443,7 @@ function sendLogin(name) {
 }
 
 function sendLogout() {
-    socket.emit('logout', gameInfo.username, gameInfo.userid);
+    socket.emit('logout', gameInfo.username, gameInfo.userid, gameInfo.lobby);
 }
 
 // Start the game in the current lobby
