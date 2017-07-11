@@ -20,6 +20,7 @@ module.exports.room = function() {
     this.field_height = 0;
     this.field_width = 0;
     this.field;
+    this.background;
 
     // Stone constructor
     this.stone = function(userid) {
@@ -141,6 +142,7 @@ module.exports.room = function() {
     }
 
     this.reset = function() {
+        this.background = 0;
         this.level = 1;
         this.score = 0;
         this.gameOver = false;
@@ -468,10 +470,12 @@ module.exports.room = function() {
     }
 
     this.updateScoreLevel = function() {
+        if (Math.abs(this.score - (this.field_width * this.multiplier))  >= 300) {
+            this.level++;
+            this.setSpeed();
+            this.callSpeedCallback();
+        }
         this.score += this.field_width * this.multiplier;
-        this.level++;
-        this.setSpeed();
-        this.callSpeedCallback();
     }
 
     this.setStaticStone = function(userid) {

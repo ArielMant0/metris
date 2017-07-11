@@ -90,8 +90,8 @@ function createScoreTable() {
         db.run('CREATE TABLE IF NOT EXISTS highscores' +
             '(name TEXT PRIMARY KEY NOT NULL,' +
             ' score INT NOT NULL,' +
-            ' date INTEGER NOT NULL,' +
-            ' game TEXT NOT NULL)', [], function(error, rows) {
+            ' game TEXT NOT NULL,' +
+            ' date DATETIME DEFAULT CURRENT_TIMESTAMP)', [], function(error, rows) {
         if (error)
             console.log('Creating highscores table failed: ' + error);
         });
@@ -100,16 +100,17 @@ function createScoreTable() {
 
 function updateScoreTable(name, score, game) {
     var currentScore = score;
-    db.get('SELECT * FROM highscores WHERE name = ?', [name], function(error, row) {
-        if (!error && row)
-            currentScore = row.score > currentScore ? row.score : currentScore;
-    });
 
     db.serialize(function() {
-        db.run('INSERT OR REPLACE INTO highscores (name, score, date, game) VALUES ($n, $s, $d, $g)',
-            { $n: name, $s: currentScore, $d: new Date().toDateString(), $g: game }, function(error) {
-            if (error)
-                console.log('Setting new user score failed: ' + "[" + name + ", " + score + "]\n" + error);
+        db.get('SELECT * FROM highscores WHERE name = ? AND score > ?', [name, score], function(error, row) {
+            if (!error && row)
+                currentScore = row.score;
+
+            db.run('INSERT OR REPLACE INTO highscores (name, score, game) VALUES ($n, $s, $g)',
+                    { $n: name, $s: currentScore, $g: game }, function(error) {
+                if (error)
+                    console.log('Setting new user score failed: ' + "[" + name + ", " + score + "]\n" + error);
+            });
         });
     });
 }
@@ -139,7 +140,7 @@ function sortScores(req, res, next) {
     switch (parseInt(req.query.sort)) {
         case 1: by = 'LOWER(name)'; break;
         case 2: by = 'LOWER(game)'; break;
-        case 3: by = 'date'; break;
+        case 3: by = 'DATETIME(date)'; break;
         default: by = 'score'; break;
     }
     var ord = parseInt(req.query.sort)
@@ -176,7 +177,7 @@ function setEventHandlers() {
         socket.on('disconnect', function(username, id) {
             if (users.has(username)) {
                 if (users.get(username).length > 0 && id >= 0)
-                    users.get(username).removeUser(id);
+                    roomlist.get(users.get(username)).removeUser(id);
                 users.delete(username);
             }
         });

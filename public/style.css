@@ -18,6 +18,13 @@ footer p {
     margin: 10px;
 }
 
+#login-msg, #create-msg {
+    display: none;
+    color: red;
+    font-weight: bold;
+    padding: 5px;
+}
+
 #controls {
     display: flex;
     justify-content: space-around;

@@ -1,5 +1,15 @@
-var currentSort = 0;
-var currentOrder = 1;
+var NAME_REGEX = /[^A-Za-z0-9_\-äÄüÜöÖ\s]/;
+
+// Enum
+var Title = {
+	Lobbies: ' - Lobbies',
+	Highscores: ' - Highscores',
+	Game: ' - Game: ',
+	Controls: ' - Controls'
+};
+
+var currentSort;
+var currentOrder;
 
 $(document).ready(function () {
 	setEventListeners();
@@ -34,44 +44,43 @@ function sendAjaxListeners(method, url, elem, func, body=undefined) {
 }
 
 function initControlsListeners() {
-	document.title = document.title.split('-')[0] + ' - Controls';
-
+	setDocTitle(Title.Controls);
+	// Check if game tab should be shown or not
 	checkGameTab();
 }
 
 function initGameListeners() {
-	document.title = document.title.split('-')[0] + ' - Game: ' + gameInfo.lobby;
-
+	setDocTitle(Title.Game);
+	// Check if game tab should be shown or not
 	checkGameTab();
-
+	// Start the game
 	startgame();
 }
 
 function initHighscoreListeners() {
-	document.title = document.title.split('-')[0] + ' - Highscores';
+	setDocTitle(Title.Highscores);
 
-	checkGameTab();
+	// Check if game tab should be shown or not
+	checkGameTab(Title.Lobbies);
 
+	// Send score request for highscore list
 	$('#score-sort-button').on('click', function() {
 		loadHighscores({ data: { sort: parseInt($('#scores-sort').val()),
 							  	 order: parseInt($('#order-sort').val()) }});
 	});
 
-	$("#scores-sort > option").each(function() {
-		$(this).prop('selected', false);
-	});
+	// Show the currently selected sorting parameters
 	$("#scores-sort > option[value="+currentSort+"]").prop('selected', true);
-
-	$("#order-sort > option").each(function() {
-		$(this).prop('selected', false);
-	});
 	$("#order-sort > option[value="+currentOrder+"]").prop('selected', true);
 }
 
 function initLobbyListeners() {
+	// Set page content height
 	$('#content').innerHeight($('body').innerHeight() - $('footer').outerHeight() - $('#topnav').outerHeight());
-	document.title = document.title.split('-')[0] + ' - Lobbies';
 
+	setDocTitle(Title.Lobbies);
+
+	// Check if game tab should be shown or not
 	checkGameTab();
 
 	$('.watch-button').each(function() {
@@ -87,14 +96,8 @@ function initLobbyListeners() {
 							  order: parseInt($('#order-sort').val()) }});
 	});
 
-	$("#lobbies-sort > option").each(function() {
-		$(this).prop('selected', false);
-	});
+	// Show the currently selected sorting parameters
 	$("#lobbies-sort > option[value="+currentSort+"]").prop('selected', true);
-
-	$("#order-sort > option").each(function() {
-		$(this).prop('selected', false);
-	});
 	$("#order-sort > option[value="+currentOrder+"]").prop('selected', true);
 
 	if (isLoggedIn()) {
@@ -135,6 +138,16 @@ function initLobbyListeners() {
 		});
 
 		adjustHidden('#fixed-size');
+
+		$('#lobby-name').on('input', function() {
+			var str = $(this).val();
+			if (str.match(NAME_REGEX) !== null) {
+				handleUserInput(true, true, 'Your game name may only contain letters, numbers, underscores and hyphens!');
+				$(this).val(str.replace(NAME_REGEX, ''));
+			} else {
+				handleUserInput(true, false);
+			}
+		});
 
 		$('#max-players').on('input', function() {
 			$('#max-players-desc').text($('#max-players').val());
@@ -188,7 +201,6 @@ function initLobbyListeners() {
 
 function logout() {
 	sendLogout();
-	reset();
 	sendAjaxListeners('get', '/lobbies', '#content', initLobbyListeners);
 
 }
@@ -288,12 +300,47 @@ function setEventListeners() {
     // Close dialog on clicking the 'X' button
 	$('#close-login-modal').on('click', function() {
 		$('#login-modal').css('display', 'none');
+		$('#login-msg').css('display', 'none');
 	});
 	// Store username on submit
 	$('#submit-login').on('click', function() {
 		login($('#login-name').val());
 	});
+	// Only allow letters, numbers and underscores in a username
+	$('#login-name').on('input', function() {
+		var str = $(this).val();
+		if (str.match(NAME_REGEX) !== null) {
+			handleUserInput(false, true, 'Your username may only contain letters, numbers, underscores and hyphens!');
+			$(this).val(str.replace(NAME_REGEX, ''));
+		} else {
+			handleUserInput(false, false);
+		}
+	});
 };
+
+function setDocTitle(content) {
+	if (content === Title.Game)
+		content += gameInfo.lobby;
+
+	document.title = document.title.split('-')[0] + content;
+}
+
+function handleUserInput(createlobby, error, msg='') {
+	if (createlobby) {
+		$('#create-msg').text(msg);
+		if (error)
+			$('#create-msg').css('display', 'block');
+		else
+			$('#create-msg').css('display', 'none');
+	} else {
+		$('#login-msg').text(msg);
+		if (error)
+			$('#login-msg').css('display', 'block');
+		else
+			$('#login-msg').css('display', 'none');
+	}
+
+}
 
 function adjustHidden(item) {
 	if ($(item).prop('checked'))
