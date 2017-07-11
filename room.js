@@ -470,7 +470,8 @@ module.exports.room = function() {
     }
 
     this.updateScoreLevel = function() {
-        if (Math.abs(this.score - (this.field_width * this.multiplier))  >= 300) {
+        var newScore = this.score + (this.field_width * this.multiplier);
+        if (Math.abs(this.score - newScore)  >= 300) {
             this.level++;
             this.setSpeed();
             this.callSpeedCallback();
