@@ -472,11 +472,11 @@ module.exports.room = function() {
     this.updateScoreLevel = function() {
         var newScore = this.score + (this.field_width * this.multiplier);
         if (Math.abs(this.score - newScore)  >= 300) {
+            this.score += this.field_width * this.multiplier;
             this.level++;
             this.setSpeed();
             this.callSpeedCallback();
         }
-        this.score += this.field_width * this.multiplier;
     }
 
     this.setStaticStone = function(userid) {
