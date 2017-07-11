@@ -101,7 +101,7 @@ module.exports.room = function() {
     }
 
     this.setSpeed = function() {
-        if (this.speed > 250) {
+        if (this.speed - 250 > 25) {
             this.speed -= 250;
             this.multiplier++;
         } else {
@@ -471,11 +471,13 @@ module.exports.room = function() {
 
     this.updateScoreLevel = function() {
         var newScore = this.score + (this.field_width * this.multiplier);
-        if (Math.abs(this.score - newScore)  >= 300) {
+        if (Math.abs(this.score - newScore)  >= 200) {
             this.score += this.field_width * this.multiplier;
             this.level++;
             this.setSpeed();
             this.callSpeedCallback();
+        } else {
+            this.score += this.field_width * this.multiplier;
         }
     }
 
