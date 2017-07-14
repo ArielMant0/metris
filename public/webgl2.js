@@ -111,8 +111,8 @@ $(document).ready(function () {
     });
 
     socket.on('showGame', function() {
-        if (gameInfo.lobby)
-            loadGame({ data: { gameID: gameInfo.lobby }});
+        if (gameInfo.gameid)
+            loadGame({ data: { gameID: gameInfo.gameid }});
     })
 
     socket.on('moveField', function (field) {
@@ -212,8 +212,9 @@ $(document).ready(function () {
         sendAjax('get', '/error', '#content');
     });
 
-    socket.on('setspecinfo', function(lobbyname, width, height, hashes) {
+    socket.on('setspecinfo', function(lobbyname, lobbyid, width, height, hashes) {
         gameInfo.lobby = lobbyname;
+        gameInfo.gameid = lobbyid;
         gameInfo.field_width = width;
         gameInfo.field_height = height;
         for (i = 0; i < hashes.length; i++) {
@@ -261,7 +262,7 @@ $(document).ready(function () {
     $(document).keydown(function (e) {
         // A, E, Q, D, S
         if (!spectator && gameRunning && (e.which == 65 || e.which == 69 || e.which == 81 || e.which == 68 || e.which == 83))
-            submitmove(e.which, gameInfo.userid);
+            submitmove(e.which);
         else if (gameRunning && e.which === 27) // Escape
             closeLobby();
         else if (gameRunning && e.which === 32) // Space
@@ -274,15 +275,15 @@ $(document).ready(function () {
 });
 
 function instaDrop() {
-    socket.emit('drop', gameInfo.lobby, gameInfo.userid);
+    socket.emit('drop', gameInfo.gameid, gameInfo.userid);
 }
 
-function watchAsSpectator(lobbyname) {
+function watchAsSpectator(lobbyid) {
     if (isInGame())
         leaveGame();
 
     spectator = true;
-    socket.emit('spectate', lobbyname);
+    socket.emit('spectate', lobbyid);
 }
 
 function showPauseText() {
@@ -294,11 +295,11 @@ function hidePauseText() {
 }
 
 function pauseLobby() {
-    socket.emit('togglepause', gameInfo.lobby, gameInfo.userid);
+    socket.emit('togglepause', gameInfo.gameid, gameInfo.userid);
 }
 
 function closeLobby() {
-    socket.emit('endgame', gameInfo.lobby, gameInfo.userid);
+    socket.emit('endgame', gameInfo.gameid, gameInfo.userid);
 }
 
 function playerColor(x, y, z) {
@@ -365,7 +366,7 @@ function updateDropStone() {
 function createLobbyFixed(lobby, bg, fwidth, fheight, maxplayers) {
     if (gameInfo.username) {
         if (spectator) {
-            socket.emit('endspectate', gameInfo.lobby);
+            socket.emit('endspectate', gameInfo.gameid);
             reset();
         }
         gameInfo.background = bg;
@@ -376,7 +377,7 @@ function createLobbyFixed(lobby, bg, fwidth, fheight, maxplayers) {
 function createLobby(lobby, bg) {
     if (gameInfo.username) {
         if (spectator) {
-            socket.emit('endspectate', gameInfo.lobby);
+            socket.emit('endspectate', gameInfo.gameid);
             reset();
         }
         gameInfo.background = bg;
@@ -405,12 +406,13 @@ function reset(killmusic=true) {
     gameInfo.score = 0;
     gameInfo.paused = false;
     gameInfo.background = 0;
+    gameInfo.gameid = '';
     gameInfo.stone_drop = [-1, -1, -1, -1];
+    gameInfo.field = [];
     gameRunning = false;
     level = 1;
     players = [];
     spectator = false;
-    gameInfo.field = [];
 
     if (killmusic) {
         audio.pause();
@@ -420,23 +422,25 @@ function reset(killmusic=true) {
 
 // Send player movement
 function submitmove(key) {
-    socket.emit('playermove', gameInfo.lobby, key, gameInfo.userid);
+    socket.emit('playermove', gameInfo.gameid, key, gameInfo.userid);
 }
 
 function joinGame(lobby) {
-    if (isInGame() && lobby != gameInfo.lobby) {
+    if (isInGame() && lobby != gameInfo.gameid) {
         alert('You must leave your current game before joining another one!');
     } else if (!isInGame()) {
         if (spectator) {
-            socket.emit('endspectate', gameInfo.lobby);
+            socket.emit('endspectate', gameInfo.gameid);
             reset();
         }
-        socket.emit('join', lobby, gameInfo.username, spectator);
+        socket.emit('join', lobby, gameInfo.username);
+    } else {
+        //sho();
     }
 }
 
 function leaveGame() {
-    socket.emit('leave', gameInfo.lobby, gameInfo.userid, gameInfo.username);
+    socket.emit('leave', gameInfo.gameid, gameInfo.userid, gameInfo.username);
 }
 
 function sendLogin(name) {
@@ -444,7 +448,7 @@ function sendLogin(name) {
 }
 
 function sendLogout() {
-    socket.emit('logout', gameInfo.username, gameInfo.userid, gameInfo.lobby);
+    socket.emit('logout', gameInfo.username, gameInfo.userid, gameInfo.gameid);
     reset();
 }
 
@@ -456,9 +460,9 @@ function startgame() {
     // Socket senden
     if (!gameRunning) {
         audio.currentTime = 0;
-        socket.emit('startgame', gameInfo.lobby, gameInfo.userid);
+        socket.emit('startgame', gameInfo.gameid, gameInfo.userid);
     } else {
-        socket.emit('updategame', gameInfo.lobby);
+        socket.emit('updategame', gameInfo.gameid);
     }
 
     audio.play();

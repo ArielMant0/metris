@@ -46,7 +46,7 @@ module.exports.room = function() {
     this.score = 0;
     this.level = 1;
     this.multiplier = 1;
-    this.id = 0;
+    this.id = '';
     this.name = '';
     // Players and stones
     this.players = [];

@@ -85,9 +85,9 @@ function initLobbyListeners() {
 
 	$('.watch-button').each(function() {
 		$(this).on('click', function () {
-			var lobbyname = $('#'+$(this).attr('id').split('-')[0]).text();
-			watchAsSpectator(lobbyname);
-			loadGame({ data: { gameID: lobbyname }});
+			var lobbyid = $('#'+$(this).attr('id').split('.')[0]).text();
+			watchAsSpectator(lobbyid);
+			loadGame({ data: { gameID: lobbyid }});
 		});
 	});
 
@@ -103,8 +103,7 @@ function initLobbyListeners() {
 	if (isLoggedIn()) {
 		$('.lobby-button').each(function() {
 			$(this).on('click', function () {
-				var lobbyname = $('#'+$(this).attr('id').split('-')[0]).text();
-				joinGame(lobbyname);
+				joinGame($(this).attr('id').split('.')[0]);
 			});
 		});
 
@@ -120,7 +119,7 @@ function initLobbyListeners() {
 			$('#' + gameInfo.gameid + '-watch').text('Go');
 			$('#' + gameInfo.gameid + '-watch').addClass('nonspec');
 			$('#' + gameInfo.gameid + '-watch').off();
-			$('#' + gameInfo.gameid + '-watch').on('click', { gameID: gameInfo.lobby }, loadGame);
+			$('#' + gameInfo.gameid + '-watch').on('click', { gameID: gameInfo.gameid }, loadGame);
 		}
 
 		$('#create-lobby').on('click', function() {
@@ -291,9 +290,7 @@ function setEventListeners() {
 
     $('#get-game').on('click', function() {
     	if (isInGame() || spectator) {
-	    	loadGame({ data: { gameID: gameInfo.lobby }});
-	    } else {
-	    	alert("You need to be logged in and inside a lobby to play!");
+	    	loadGame({ data: { gameID: gameInfo.gameid }});
 	    }
     });
 

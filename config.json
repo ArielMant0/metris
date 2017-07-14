@@ -1,5 +1,6 @@
 {
 	"port": 8080,
 	"debug": false,
-	"binary": false
+	"binary": false,
+	"db": "users.db"
 }
