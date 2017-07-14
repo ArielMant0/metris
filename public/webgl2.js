@@ -229,6 +229,7 @@ $(document).ready(function () {
         gameInfo.field_height = data.height;
         gameInfo.username = data.username;
         gameInfo.gameid = data.gameid;
+        gameInfo.background = data.background;
         gameInfo.paused = false;
         computeColor(gameInfo.userid, data.hash);
         colorUsername();
@@ -368,7 +369,7 @@ function createLobbyFixed(lobby, bg, fwidth, fheight, maxplayers) {
             reset();
         }
         gameInfo.background = bg;
-        socket.emit('createlobbyfixed', lobby, gameInfo.username, fwidth, fheight, maxplayers);
+        socket.emit('createlobbyfixed', lobby, gameInfo.username, fwidth, fheight, maxplayers, bg);
     }
 }
 
@@ -379,7 +380,7 @@ function createLobby(lobby, bg) {
             reset();
         }
         gameInfo.background = bg;
-        socket.emit('createlobby', lobby, gameInfo.username);
+        socket.emit('createlobby', lobby, gameInfo.username, bg);
     }
 }
 

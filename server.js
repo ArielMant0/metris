@@ -219,12 +219,12 @@ function setEventHandlers() {
             }
     	});
 
-        socket.on('createlobbyfixed', function(lobbyname, username, width, height, max) {
+        socket.on('createlobbyfixed', function(lobbyname, username, width, height, max, bg) {
             if (!roomlist.has(lobbyname)) {
                 socket.join(lobbyname, function() {
                     roomlist.set(lobbyname, new lobby.room());
                     game = roomlist.get(lobbyname);
-                    game.createRoomFixed(lobbyname, generateRoomID(), username, width, height, max);
+                    game.createRoomFixed(lobbyname, generateRoomID(), username, width, height, max, bg);
                     game.setGameOverCallback(endGame);
                     game.setSpeedCallback(updateSpeed);
                     users.set(username, game.name);
@@ -233,7 +233,8 @@ function setEventHandlers() {
                     // Tell socket game info
                     socket.emit('setgameinfo', { lobbyname: game.name, id: uId,
                         width: game.field_width, height: game.field_height,
-                        username: username, hash: game.players[uId].hash, gameid: game.id });
+                        username: username, hash: game.players[uId].hash,
+                        gameid: game.id, background: game.background });
                 });
             } else {
                 setLastError(0, lobbyname);
@@ -241,12 +242,12 @@ function setEventHandlers() {
             }
         });
 
-        socket.on('createlobby', function(lobbyname, username) {
+        socket.on('createlobby', function(lobbyname, username, bg) {
             if (!roomlist.has(lobbyname)) {
                 socket.join(lobbyname, function() {
                     roomlist.set(lobbyname, new lobby.room());
                     game = roomlist.get(lobbyname);
-                    game.createRoom(lobbyname, generateRoomID(), username);
+                    game.createRoom(lobbyname, generateRoomID(), username, bg);
                     game.setGameOverCallback(endGame);
                     game.setSpeedCallback(updateSpeed);
                     users.set(username, game.name);
@@ -255,7 +256,8 @@ function setEventHandlers() {
                     // Tell socket game info
                     socket.emit('setgameinfo', { lobbyname: game.name, id: uId,
                         width: game.field_width, height: game.field_height,
-                        username: username, hash: game.players[uId].hash, gameid: game.id });
+                        username: username, hash: game.players[uId].hash,
+                        gameid: game.id, background: game.background });
                 });
             } else {
                 setLastError(0, lobbyname);
@@ -327,7 +329,8 @@ function setEventHandlers() {
                         // Tell the player its game info
                         socket.emit('setgameinfo', { lobbyname: game.name, id: uId,
                             width: game.field_width, height: game.field_height,
-                            username: username, hash: game.players[uId].hash, gameid: game.id });
+                            username: username, hash: game.players[uId].hash,
+                            gameid: game.id, background: game.background });
 
                         socket.broadcast.to(game.name).emit('userhash', uId, game.players[uId].hash);
                         socket.emit('sethashes', game.getAllHashes());

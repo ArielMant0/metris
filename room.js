@@ -20,7 +20,7 @@ module.exports.room = function() {
     this.field_height = 0;
     this.field_width = 0;
     this.field;
-    this.background;
+    this.background = 0;
 
     // Stone constructor
     this.stone = function(userid) {
@@ -64,10 +64,11 @@ module.exports.room = function() {
     this.fixed = false;
     this.maxPlayers = 4;
 
-    this.createRoom = function(roomName, roomID, user) {
+    this.createRoom = function(roomName, roomID, user, bg=0) {
         if (!this.gameStarted && !this.gameOver) {
             this.name = roomName;
             this.id = roomID;
+            this.background = bg;
             this.field_width = DEFAULT_WIDTH;
             this.field_height = DEFAULT_HEIGHT;
             this.fixed = false;
@@ -79,10 +80,11 @@ module.exports.room = function() {
         }
     };
 
-    this.createRoomFixed = function(roomName, roomID, user, width, height, max) {
+    this.createRoomFixed = function(roomName, roomID, user, width, height, max, bg=0) {
         if (!this.gameStarted && !this.gameOver) {
             this.name = roomName;
             this.id = roomID;
+            this.background = bg;
             this.field_width = width;
             this.field_height = height;
             this.fixed = true;
@@ -142,9 +144,9 @@ module.exports.room = function() {
     }
 
     this.reset = function() {
-        this.background = 0;
         this.level = 1;
         this.score = 0;
+        this.multiplier = 1;
         this.gameOver = false;
         this.gameStarted = false;
         this.stateChanged = false;
@@ -470,10 +472,10 @@ module.exports.room = function() {
     }
 
     this.updateScoreLevel = function() {
-        var newScore = this.score + (this.field_width * this.multiplier);
-        if (Math.abs(this.score - newScore)  >= 200) {
+        var diff = Math.abs(Math.floor(this.score / 200) - Math.floor((this.score + (this.field_width * this.multiplier)) / 200));
+        if (diff > 0) {
             this.score += this.field_width * this.multiplier;
-            this.level++;
+            this.level += diff;
             this.setSpeed();
             this.callSpeedCallback();
         } else {
