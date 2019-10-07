@@ -70,6 +70,7 @@ var SOLID_STONE = 26;
 var colors = [];
 var players = [];
 var gameInfo = {
+    mode: "none",
     userid: 0,
     gameid: 0,
     lobby: '',
@@ -110,73 +111,41 @@ $(document).ready(function () {
         audio2.play();
     });
 
-    socket.on('showGame', function() {
-        if (gameInfo.gameid)
-            loadGame({ data: { gameID: gameInfo.gameid }});
-    })
-
     socket.on('moveField', function (field) {
-        if (readBinary) {
-            var bufView = new Uint8Array(field);
-            gameInfo.field = Array.prototype.slice.call(bufView);
-        } else {
-            gameInfo.field = field;
-        }
+        gameInfo.field = field;
     });
 
     socket.on('movePlayers', function (stones) {
-        if (readBinary)
-            var bufView = new Uint16Array(stones);
-        else
-            players = stones;
-        if (!spectator)
-            updateDropStone();
+        players = stones;
+        if (!spectator) updateDropStone();
     });
 
     socket.on('moveScore', function (score, lvl) {
-        if (readBinary) {
-            var bufView = new Uint16Array(score);
-            if (bufView[0] != gameInfo.score)
-                updateScore(bufView[0]);
-            bufView = new Uint16Array(level);
-            if (bufView[0] != level)
-                updateLevel(bufView[0]);
-        } else {
-            if (score != gameInfo.score)
-                updateScore(score);
-            if (lvl != level) {
-                resetBuffer = true;
-                updateLevel(lvl);
-            }
+        if (score != gameInfo.score)
+            updateScore(score);
+        if (lvl != level) {
+            resetBuffer = true;
+            updateLevel(lvl);
         }
     });
 
     socket.on('begin', function (field) {
-        if (readBinary) {
-            var bufView = new Uint8Array(data);
-            gameInfo.field = Array.prototype.slice.call(bufView);
-        } else {
-            gameInfo.field = field;
-        }
+        gameInfo.field = field;
         gameInfo.score = 0;
         level = 1;
         gameRunning = true;
         updateScore(gameInfo.score);
         updateLevel(level);
+        gameInfo.mode = "running";
+        console.debug("game started");
+        loadGame({ data: { gameID: gameInfo.gameid }});
     });
 
     socket.on('resizefield', function(width, height, field, stones) {
         gameInfo.field_width = width;
         gameInfo.field_height = height;
-        if (readBinary) {
-            var bufView1 = new Uint8Array(field);
-            gameInfo.field = Array.prototype.slice.call(bufView1);
-            var bufView2 = new Uint16Array(stones);
-            players = Array.prototype.slice.call(bufView2);
-        } else {
-            gameInfo.field = field;
-            players = stones;
-        }
+        gameInfo.field = field;
+        players = stones;
     });
 
     socket.on('leftgame', function() {
@@ -186,10 +155,14 @@ $(document).ready(function () {
     socket.on('loggedout', function() {
         reset();
         gameInfo.username = '';
+        $('#login-button').text("login");
     });
 
     socket.on('loggedin', function(name) {
+        console.debug("logged in as ", name);
         gameInfo.username = name;
+        gameInfo.mode = "none";
+        $('#login-button').text("logout");
     });
 
     socket.on('pause', function() {
@@ -202,9 +175,13 @@ $(document).ready(function () {
         hidePauseText();
     });
 
-    socket.on('gameover', function() {
-        $('#gameover-score').html('Final Score: ' + gameInfo.score);
-        $('#game-over').css('display', 'block');
+    socket.on('gameover', function(winner) {
+        if (winner.name) {
+            $('#gameover-score').text(`${winner.name} won with a score of ${winner.score}`);
+        } else {
+            $('#gameover-score').text(`Final Score: ${winner.score}`);
+        }
+        $('#game-over').show();
         reset(false);
     });
 
@@ -217,9 +194,7 @@ $(document).ready(function () {
         gameInfo.gameid = lobbyid;
         gameInfo.field_width = width;
         gameInfo.field_height = height;
-        for (i = 0; i < hashes.length; i++) {
-            computeColor(i, hashes[i]);
-        }
+        hashes.forEach((hash,i) => computeColor(i, hash));
         spectator = true;
     });
 
@@ -231,10 +206,12 @@ $(document).ready(function () {
         gameInfo.username = data.username;
         gameInfo.gameid = data.gameid;
         gameInfo.background = data.background;
-        gameInfo.paused = false;
+        gameInfo.paused = data.paused;
         computeColor(gameInfo.userid, data.hash);
         colorUsername();
         spectator = false;
+        gameInfo.mode = "joined";
+        console.log("joined lobby ", data.lobbyname);
     });
 
     socket.on('userhash', function(id, hash) {
@@ -242,9 +219,7 @@ $(document).ready(function () {
     });
 
     socket.on('sethashes', function(hashes) {
-        for (i = 0; i < hashes.length; i++) {
-            computeColor(i, hashes[i]);
-        }
+        hashes.forEach((hash,i) => computeColor(i, hash));
     });
 
     $('#get-lobbies').on('click', function () {
@@ -263,11 +238,11 @@ $(document).ready(function () {
         // A, E, Q, D, S
         if (!spectator && gameRunning && (e.which == 65 || e.which == 69 || e.which == 81 || e.which == 68 || e.which == 83))
             submitmove(e.which);
-        else if (gameRunning && e.which === 27) // Escape
+        else if (!spectator && gameRunning && e.which === 27) // Escape
             closeLobby();
-        else if (gameRunning && e.which === 32) // Space
+        else if (!spectator && gameRunning && e.which === 32) // Space
             instaDrop()
-        else if (gameRunning && e.which === 80) // P
+        else if (!spectator && gameRunning && e.which === 80) // P
             pauseLobby();
         else if (gameRunning && e.which === 82) // R
             plz_rotateAll = !plz_rotateAll;
@@ -279,27 +254,26 @@ function instaDrop() {
 }
 
 function watchAsSpectator(lobbyid) {
-    if (isInGame())
-        leaveGame();
+    if (isInGame()) leaveGame();
 
     spectator = true;
     socket.emit('spectate', lobbyid);
 }
 
 function showPauseText() {
-    $('#game-pause').css('display', 'block');
+    $('#game-pause').show();
 }
 
 function hidePauseText() {
-    $('#game-pause').css('display', 'none');
+    $('#game-pause').hide();
 }
 
 function pauseLobby() {
-    socket.emit('togglepause', gameInfo.gameid, gameInfo.userid);
+    socket.emit('togglepause', gameInfo.gameid, gameInfo.username);
 }
 
 function closeLobby() {
-    socket.emit('endgame', gameInfo.gameid, gameInfo.userid);
+    socket.emit('endgame', gameInfo.gameid, gameInfo.username);
 }
 
 function playerColor(x, y, z) {
@@ -307,15 +281,16 @@ function playerColor(x, y, z) {
 }
 
 function computeColor(index, hash) {
-    colors[index] = playerColor((hash & 0xFF0000) >> 16,
-                                (hash & 0x00FF00) >> 8,
-                                 hash & 0x0000FF);
+    colors[index] = playerColor(
+        (hash & 0xFF0000) >> 16,
+        (hash & 0x00FF00) >> 8,
+        hash & 0x0000FF
+    );
 }
 
 function colorUsername() {
-    $('#player-name').css('color', "rgb(" + colors[gameInfo.userid].r + ","
-                                          + colors[gameInfo.userid].g + ","
-                                          + colors[gameInfo.userid].b + ")");
+    const c = colors[gameInfo.userid];
+    $('#player-name').css('color',`rgb(${c.r},${c.g},${c.b})`);
 }
 
 function updateScore(newScore) {
@@ -389,12 +364,12 @@ function setPlayerName(name) {
     gameInfo.username = name;
 }
 
-function isLoggedIn() {
-    return gameInfo.username.length > 0;
-}
-
 function isInGame() {
     return !spectator && gameInfo.lobby.length > 0;
+}
+
+function isLoggedIn() {
+    return typeof(gameInfo.username) == "string" && gameInfo.username.length > 0;
 }
 
 function reset(killmusic=true) {
@@ -422,25 +397,23 @@ function reset(killmusic=true) {
 
 // Send player movement
 function submitmove(key) {
-    socket.emit('playermove', gameInfo.gameid, key, gameInfo.userid);
+    socket.emit('playermove', gameInfo.username, key);
 }
 
 function joinGame(lobby) {
-    if (isInGame() && lobby != gameInfo.gameid) {
-        alert('You must leave your current game before joining another one!');
-    } else if (!isInGame()) {
+    if (lobby != gameInfo.gameid) {
         if (spectator) {
             socket.emit('endspectate', gameInfo.gameid);
             reset();
         }
         socket.emit('join', lobby, gameInfo.username);
     } else {
-        //sho();
+        loadGame({ data: { gameID: gameInfo.gameid }});
     }
 }
 
 function leaveGame() {
-    socket.emit('leave', gameInfo.gameid, gameInfo.userid, gameInfo.username);
+    socket.emit('leave', gameInfo.username);
 }
 
 function sendLogin(name) {
@@ -448,7 +421,7 @@ function sendLogin(name) {
 }
 
 function sendLogout() {
-    socket.emit('logout', gameInfo.username, gameInfo.userid, gameInfo.gameid);
+    socket.emit('logout', gameInfo.username);
     reset();
 }
 
@@ -457,10 +430,8 @@ function startgame() {
     // Creates canvas to draw on
     start();
 
-    // Socket senden
     if (!gameRunning) {
-        audio.currentTime = 0;
-        socket.emit('startgame', gameInfo.gameid, gameInfo.userid);
+        socket.emit("startgame", gameInfo.username);
     } else {
         socket.emit('updategame', gameInfo.gameid);
     }

@@ -3,7 +3,7 @@ html(lang='en')
     head
         title Metris
         meta(charset='utf-8')
-
+        <link rel="shortcut icon" type="image/x-icon" href="assets/logo.png">
         link(rel='stylesheet', href='style.css')
 
         script(src='/socket.io/socket.io.js', type='text/javascript')
@@ -307,16 +307,16 @@ html(lang='en')
         nav(id='topnav')
             ul(id='nav-list')
                 li
-                    a(class='active', id='get-lobbies', href='#') Lobbies
+                    a(class='active', id='get-lobbies', href='#') lobbies
                 li
-                    a(href='#', id='get-scores') Highscores
+                    a(href='#', id='get-scores') highscores
                 li
-                    a(href='#', id='get-controls') Controls
+                    a(href='#', id='get-controls') controls
                 li
-                    a(href='#', id='get-game') Game
+                    a(href='#', id='get-game') game
             div(id='player-info')
                 span(id='player-name')
-                button(id='login-button') Login
+                button(id='login-button') login
         section
             div(class='modal', id='login-modal')
                 div(class='modal-content')
@@ -324,7 +324,7 @@ html(lang='en')
                     span(id='login-msg')
                     input(type='text', id='login-name', required, placeholder='Your Username')
                     br
-                    button(type='submit', id='submit-login') Login
+                    button(type='submit', id='submit-login') login
         section(id='content') Content here ...
         footer
             p Franziska Becker

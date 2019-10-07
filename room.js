@@ -1,29 +1,39 @@
-var MAX_PLAYERS = 25;
-var PLAYER_OFFSET = 4;
-var MIN_WIDTH = 10;
-var MIN_HEIGHT = 10;
-var DEFAULT_WIDTH = 30;
-var DEFAULT_HEIGHT = 20;
-var SOLID_STONE = 26;
+const MAX_PLAYERS = 25;
+const PLAYER_OFFSET = 4;
 
-var dbj2 = function(str) {
-    var hash = 5381;
-    for (var i = 0; i < str.length; i++) {
+const MIN_WIDTH = 10;
+const MIN_HEIGHT = 10;
+const DEFAULT_WIDTH = 30;
+const DEFAULT_HEIGHT = 20;
+
+const SOLID_STONE = 26;
+
+const START_SPEED = 1000;
+const MIN_SPEED = 40; // vorher 25
+
+const ROW_SCORE = 1.25;
+const BASE_SCORE = 10;
+
+const KEYS = {
+    rotateLeft: 81,
+    rotateRight: 69,
+    moveLeft: 65,
+    moveRight: 68,
+    moveDown: 83,
+    drop: 0
+};
+
+function strToColor(str) {
+    let hash = 5381;
+    for (let i = 0; i < str.length; i++) {
         hash = ((hash << 5) + hash) + str.charCodeAt(i);
     }
     return hash;
 }
 
-module.exports.room = function() {
+class Stone {
 
-    // Field data
-    this.field_height = 0;
-    this.field_width = 0;
-    this.field;
-    this.background = 0;
-
-    // Stone constructor
-    this.stone = function(userid) {
+    constructor(userid) {
         // 1: OX  2: XOX 4: XOX  5: XX  6: X    7: OXX  8: OX  9:  OX  10: XX   O = rotation center
         // 3: XOXX           X      OX     OXX     X       X      XX        OX
         this.kind = 1;
@@ -31,119 +41,239 @@ module.exports.room = function() {
         this.color = userid;
         this.rotation = 1;
         this.start = 0;
-    };
+    }
 
-    // Player constructor
-    this.player = function(userid, name, status) {
+    user(id) {
+        return this.color == id;
+    }
+
+    setPosition(width) {
+        const at = this.start;
+
+        switch (this.kind) {
+            case 1:
+                this.pos = [(width / 2) - 1 + at, (width / 2) + at, -1, -1];
+                break;
+            case 2:
+                this.pos = [(width / 2) - 1 + at, (width / 2) + at, (width / 2) + 1 + at, -1];
+                break;
+            case 3:
+                this.pos = [
+                    (width / 2) - 1 + at, (width / 2) + at,
+                    (width / 2) + 1 + at, (width / 2) + 2 + at
+                ]; break;
+            case 4:
+                this.pos = [
+                    (width / 2) - 1 + at, width / 2 + at,
+                    width / 2 + 1 + at, width / 2 + width + at
+                ]; break;
+            case 5:
+                this.pos = [
+                    (width / 2) - 1 + at, width / 2 + at,
+                    width / 2 - 1 + width + at, width / 2 + width + at
+                ]; break;
+            case 6:
+                this.pos = [
+                    (width / 2) - 1 + at, width / 2 - 1 + width + at,
+                    width / 2 + width + at, width / 2 + 1 + width + at
+                ]; break;
+            case 7:
+                this.pos = [
+                    (width / 2) - 1 + at, width / 2 + at,
+                    width / 2 + 1 + at, width / 2 - 1 + width + at
+                ]; break;
+            case 8:
+                this.pos = [(width / 2) - 1 + at, width / 2 + at, width / 2 - 1 + width + at, -1];
+                break;
+            case 9:
+                this.pos = [
+                    (width / 2) + at, (width / 2) + 1 + at,
+                    width / 2 - 1 + width + at, width / 2 + width + at
+                ]; break;
+            case 10:
+                this.pos = [
+                    (width / 2) - 1 + at, (width / 2) + at,
+                    width / 2 + width + at, width / 2 + 1 + width + at
+                ]; break;
+        }
+    }
+
+    down(width) {
+        this.pos.forEach(p => {
+            if (p !== -1) p += width;
+        });
+    }
+
+    left() {
+        this.pos.forEach(p => {
+            if (p !== -1) p--;
+        });
+    }
+
+    right() {
+        this.pos.forEach(p => {
+            if (p !== -1) p++;
+        });
+    }
+
+    static solid() {
+        const stone = new Stone();
+        stone.color = SOLID_STONE;
+        return stone;
+    }
+}
+
+class Player {
+
+    constructor(userid, name, status) {
         this.id = userid;
-        this.name = name;
         this.isAdmin = status;
-        this.hash = dbj2(name);
-    };
+        this.hash = strToColor(name);
+        this.score = 0;
+    }
 
-    // Metadata
-    this.speed = 1000;
-    this.score = 0;
-    this.level = 1;
-    this.multiplier = 1;
-    this.id = '';
-    this.name = '';
-    // Players and stones
-    this.players = [];
-    this.stones = [];
-    this.solids = new Set();
-    // Game flags
-    this.gameOver = false;
-    this.gameStarted = false;
-    this.stateChanged = false;
-    this.paused = false;
-    // Callbacks
-    this.callback;
-    this.speedUpdate;
-    // Player count stuff
-    this.fixed = false;
-    this.maxPlayers = 4;
+    user(id) {
+        return this.id == id;
+    }
 
-    this.createRoom = function(roomName, roomID, user, bg=0) {
-        if (!this.gameStarted && !this.gameOver) {
-            this.name = roomName;
-            this.id = roomID;
-            this.background = bg;
-            this.field_width = DEFAULT_WIDTH;
-            this.field_height = DEFAULT_HEIGHT;
-            this.fixed = false;
-            this.reset();
-            this.addUser(user, true);
-            console.log("Created Lobby: \'" + roomName + "\'");
-            console.log("\tsize = " + this.field_width + "x" + this.field_height);
-            console.log("\tcreated by = " + user);
+    makeAdmin() {
+        this.isAdmin = true;
+    }
+}
+
+const DEFAULT_SETTINGS = {
+    fixed: false,
+    width: DEFAULT_WIDTH,
+    height: DEFAULT_HEIGHT,
+    maxPlayers: MAX_PLAYERS,
+    background: 0
+};
+
+class Room {
+
+    constructor(
+        roomName,
+        roomID,
+        settings=DEFAULT_SETTINGS
+    ) {
+        // Field data
+        this.fieldHeight = settings.height;
+        this.fieldWidth = settings.width;
+        this.background = settings.background;
+        // Metadata
+        this.level = 1;
+        this.initSpeed();
+        this.id = roomID;
+        this.name = roomName;
+        // Players and stones
+        this.players = [];
+        this.stones = [];
+        this.solids = new Set();
+        // Game flags
+        this.gameOver = false;
+        this.gameStarted = false;
+        this.stateChanged = false;
+        this.paused = false;
+        this.state = -1;
+        // Callbacks
+        this.callback;
+        this.speedUpdate;
+        // Player count stuff
+        this.fixed = settings.fixed;
+        this.setMaxPlayers(settings.maxPlayers);
+        if (!this.fixed) {
+            this.calculateFieldSize();
         }
-    };
+        this.initField();
+        console.info(`Created Lobby "${this.name}"`);
+        console.info(`\tdimensions = (${this.fieldWidth}, ${this.fieldHeight})`);
+        console.info(`\tmax. players = ${this.maxPlayers}`);
+        console.info(`\tbackground = ${this.background}`);
+    }
 
-    this.createRoomFixed = function(roomName, roomID, user, width, height, max, bg=0) {
-        if (!this.gameStarted && !this.gameOver) {
-            this.name = roomName;
-            this.id = roomID;
-            this.background = bg;
-            this.field_width = width;
-            this.field_height = height;
-            this.fixed = true;
-            this.maxPlayers = max > 0 ? max : 4;
-            this.reset();
-            this.addUser(user, true);
-            console.log("Created Lobby: \'" + roomName + "\'");
-            console.log("\tsize = " + this.field_width + "x" + this.field_height);
-            console.log("\tcreated by = " + user);
+    status() {
+        const s = this.state;
+        this.state = -1;
+        return s;
+    }
+
+    score(userid=-1) {
+        if (this.hasUser(userid)) {
+            return this.players[userid].score;
+        } else {
+            return this.players.reduce((acc, p) => Math.max(acc,p.score), 0);
         }
-    };
+    }
 
-    this.initSpeed = function() {
-        this.speed = 1000;
+    initSpeed() {
+        this.speed = START_SPEED;
         this.multiplier = 1;
     }
 
-    this.setSpeed = function() {
-        if (this.speed - 250 > 25) {
-            this.speed -= 250;
-            this.multiplier++;
+    updateSpeed() {
+        const minus = Math.floor(this.speed / 4);
+        if (this.speed - minus >= MIN_SPEED) {
+            this.speed -= minus;
+            this.multiplier += 10;
         } else {
-            var newSpeed = this.speed - this.speed * (1 / 3) > 25 ? this.speed - this.speed * (1 / 3) : 25;
-            if (newSpeed != this.speed)
-                this.multiplier++;
-            this.speed = newSpeed;
+            const newSpeed = Math.max(MIN_SPEED, (this.speed - MIN_SPEED) / 2);
+            if (newSpeed != this.speed) {
+                this.multiplier += 10;
+                this.speed = newSpeed;
+            }
         }
     }
 
-    this.setSpeedCallback = function(func) {
-        this.speedUpdate = func;
-    }
-
-    this.callSpeedCallback = function() {
-        if (this.speedUpdate)
-            this.speedUpdate(this);
-    }
-
-    this.setGameOverCallback = function(func) {
+    setGameOverCallback(func) {
         this.callback = func;
     }
 
-    this.callGameOverCallback = function() {
-        if (this.callback)
-            this.callback(this.name, this.players, this.score);
+    callGameOverCallback() {
+        if (this.callback) this.callback(this.name, this.players, this.score);
+        this.stopGameLoop();
     }
 
-    this.startGame = function() {
+    setGameCallback(func) {
+        this.gameCallback = func;
+    }
+
+    callGameCallback() {
+        if (this.gameCallback) this.gameCallback(this);
+    }
+
+    startGame() {
         this.gameOver = false;
         this.gameStarted = true;
-        console.log("Game \"" + this.name + "\" started");
+        this.paused = false;
+        console.info("Game \"" + this.name + "\" started");
+        this.setGameLoop();
     }
 
-    this.initField = function() {
-        this.field = new Array(this.field_height * this.field_width);
+    stopGameLoop() {
+        if (this.interval) {
+            clearInterval(this.interval);
+            this.interval = null;
+        }
+    }
+
+    setGameLoop() {
+        this.interval = setInterval(() => {
+            this.dropStones();
+            this.callGameCallback();
+        }, this.speed);
+    }
+
+    initField() {
+        this.field = new Array(this.fieldHeight * this.fieldWidth);
         this.field.fill(0);
     }
 
-    this.reset = function() {
+    calculateFieldSize() {
+        this.fieldWidth = MIN_WIDTH + (2 * PLAYER_OFFSET);
+        this.fieldHeight = Math.max(MIN_HEIGHT, this.fieldWidth + PLAYER_OFFSET);
+    }
+
+    reset() {
         this.level = 1;
         this.score = 0;
         this.multiplier = 1;
@@ -156,82 +286,99 @@ module.exports.room = function() {
         this.solids.clear();
         this.initField();
         this.initSpeed();
-        this.setMaxPlayers();
     }
 
-    this.setMaxPlayers = function() {
-        if (!this.fixed)
-            this.maxPlayers = Math.floor((this.field_width - 1) / (PLAYER_OFFSET + 1));
+    setMaxPlayers(max) {
+        if (!this.fixed) {
+            this.maxPlayers = Math.floor((this.fieldWidth - 1) / (PLAYER_OFFSET + 1));
+        } else {
+            this.maxPlayers = max > 0 ? max : 4;
+        }
     }
 
-    this.getMaxPlayerCount = function() {
+    getMaxPlayerCount() {
         return this.fixed ? this.maxPlayers : MAX_PLAYERS;
     }
 
-    this.addUser = function(user, status=false) {
-        if (!status && this.players.length === 0)
-            status = true;
+    addUser(username, isAdmin=false) {
+        if (!isAdmin && this.players.length === 0) {
+            isAdmin = true;
+        }
 
         if (this.players.length < this.maxPlayers) {
-            console.log("Player \'" + user + "\' joined the game \'" + this.name + "\'");
-            this.players.push(new this.player(this.players.length, user, status));
-            this.stones.push(new this.stone(this.players.length));
+            console.info(`Player "${username}" joined game "${this.name}"`);
+            this.players.push(new Player(this.players.length, isAdmin));
+            this.stones.push(new Stone(this.players.length));
             this.spawnStone(this.stones.length-1);
 
-            return 1;
+            this.state = 1;
+            return this.players.length-1;
+
         } else if (!this.fixed) {
             // TODO resize field according to player count
-            console.log("Player \'" + user + "\' joined the game \'" + this.name + "\'");
+            console.info(`Player "${username}" joined game "${this.name}"`);
             this.growField();
-            this.players.push(new this.player(this.players.length, user, status));
-            this.stones.push(new this.stone(this.players.length));
+            this.players.push(new Player(this.players.length, isAdmin));
+            this.stones.push(new Stone(this.players.length));
             this.spawnStone(this.stones.length-1);
 
-            return 2;
+            this.state = 2;
+            return this.players.length-1;
         }
-        return 0;
+        this.state = 0;
+        return -1;
     }
 
-    this.togglePause = function(userid) {
-        if (this.players[userid].isAdmin) {
+    getUser(userid) {
+        return this.players.find(p => p.user(userid));
+    }
+
+    hasUser(userid) {
+        return userid >= 0 && userid < this.players.length;
+    }
+
+    togglePause(userid) {
+        if (this.isAdmin(userid)) {
             this.paused = !this.paused;
             return true;
         }
         return false;
     }
 
-    this.getAllHashes = function() {
-        list = [];
-        for (i = 0; i < this.players.length; i++) {
-            list.push(this.players[i].hash);
-        }
-        return list;
+    getAllHashes() {
+        return this.players.map(p => p.hash);
     }
 
-    this.isAdmin = function(userid) {
-        return userid >= 0 && userid < this.players.length && this.players[userid].isAdmin;
+    isAdmin(userid) {
+        return this.hasUser(userid) && this.players[userid].isAdmin;
     }
 
-    this.instaDrop = function(userid) {
-        var tmp = [true, true, true, true]
-        var found = false;
-        for (i = 0; i < 4; i++) {
-            for (j = 0; j < 4; j++) {
-                if (this.stones[userid].pos[i] + this.field_width === this.stones[userid].pos[j] || this.stones[userid].pos[i] === -1)
+    instaDrop(userid) {
+        if (!this.hasUser(userid)) return;
+
+        const tmp = [true, true, true, true]
+        let found = false;
+        for (let i = 0; i < 4; i++) {
+            for (let j = 0; j < 4; j++) {
+                if (this.stones[userid].pos[i] + this.fieldWidth === this.stones[userid].pos[j] ||
+                    this.stones[userid].pos[i] === -1
+                ) {
                     tmp[i] = false;
+                }
             }
         }
-        var tmpStone = [-1, -1, -1, -1];
-        for (k = 0; k < 4; k++) {
+
+        let tmpStone = [-1, -1, -1, -1];
+        for (let k = 0; k < 4; k++) {
             if (tmp[k] === true) {
-                var max_h = this.field_height - Math.floor(this.stones[userid].pos[k] / this.field_width)
-                for (l = 0; l < max_h; l++) {
-                    if (this.field[this.stones[userid].pos[k] + (l + 1) * this.field_width] > 0 || l === max_h - 1) {
-                        if (!found || this.stones[userid].pos[0] + l * this.field_width < tmpStone[0]) {
-                            tmpStone = [this.stones[userid].pos[0] + l * this.field_width,
-                                        this.stones[userid].pos[1] + l * this.field_width,
-                                        this.stones[userid].pos[2] === -1 ? -1 : this.stones[userid].pos[2] + l * this.field_width,
-                                        this.stones[userid].pos[3] === -1 ? -1 : this.stones[userid].pos[3] + l * this.field_width]
+                const max_h = this.fieldHeight - Math.floor(this.stones[userid].pos[k] / this.fieldWidth)
+                for (let l = 0; l < max_h; l++) {
+                    if (this.field[this.stones[userid].pos[k] + (l + 1) * this.fieldWidth] > 0 || l === max_h - 1) {
+                        if (!found || this.stones[userid].pos[0] + l * this.fieldWidth < tmpStone[0]) {
+                            tmpStone = [this.stones[userid].pos[0] + l * this.fieldWidth,
+                                        this.stones[userid].pos[1] + l * this.fieldWidth,
+                                        this.stones[userid].pos[2] === -1 ? -1 : this.stones[userid].pos[2] + l * this.fieldWidth,
+                                        this.stones[userid].pos[3] === -1 ? -1 : this.stones[userid].pos[3] + l * this.fieldWidth]
                             found = true;
                         }
                     }
@@ -243,18 +390,16 @@ module.exports.room = function() {
         this.stonefinished(userid);
     }
 
-    this.setStartPosition = function(userid) {
-        if ((userid + 1) % 2 === 0)
+    setStartPosition(userid) {
+        if ((userid + 1) % 2 === 0) {
             this.stones[userid].start = -PLAYER_OFFSET * Math.floor((userid + 1) / 2);
-        else
+        } else {
             this.stones[userid].start = PLAYER_OFFSET * Math.floor((userid + 1) / 2);
+        }
     }
 
-    this.removeUser = function(userid) {
+    removeUser(userid) {
         if (userid >= 0 && userid < this.players.length) {
-            // Log user leaving game
-            console.log("Player \'" + this.players[userid].name + "\' left the game \'" + this.name + "\'");
-
             // Remove player and player's stone from game
             if (userid === 0) {
                 this.players.shift();
@@ -263,134 +408,141 @@ module.exports.room = function() {
                 this.players.pop();
                 this.stones.pop();
             } else {
-                this.players = this.players.filter(function(item) { return item.id !== userid; });
-                this.stones = this.stones.filter(function(item) { return item.color !== userid; });
+                this.players = this.players.filter(function(p) { return p.user(userid); });
+                this.stones = this.stones.filter(function(s) { return s.user(userid); });
             }
             // Delete/Reset game when there is no player left
             if (this.players.length === 0) {
                 this.callGameOverCallback();
             } else {
-                if (this.players.length === 1)
-                    this.players[0].isAdmin = true;
+                if (this.players.length === 1) {
+                    this.players[0].makeAdmin();
+                }
                 if (!this.fixed) {
                     this.shrinkField();
-                    return 2;
+                    return this.state = 2;
                 }
             }
-            return 1;
+            return this.state = 1;
         }
-        return 0;
+        this.state = 0;
     }
 
-    this.getLastUser = function() {
+    getLastUser() {
         return this.players.length - 1;
     }
 
-    this.getUserID = function(username) {
-        return this.players.findIndex(function(item, index, array) {
-            return item.name === this;
-        }, username);
-    }
-
     // Increase field size and transfer old data + update all players
-    this.growField = function() {
+    growField() {
+        if (this.fixed) return;
+
+        const prev = this.paused;
         this.paused = true;
         this.maxPlayers++;
-        // Store old field size to be able to adjust players
-        var oldWidth = this.field_width;
-        var oldHeight = this.field_height;
-        // Compute new field size
-        var newWidth = oldWidth + (2 * PLAYER_OFFSET);
-        var newHeight = newWidth + PLAYER_OFFSET > oldHeight ? newWidth + PLAYER_OFFSET : oldHeight;
+        // store old field size to be able to adjust players
+        const oldWidth = this.fieldWidth;
+        const oldHeight = this.fieldHeight;
+        // compute new field size
+        const newWidth = oldWidth + (2 * PLAYER_OFFSET);
+        const newHeight = newWidth + PLAYER_OFFSET > oldHeight ?
+            newWidth + PLAYER_OFFSET :
+            oldHeight;
 
         this.field = this.adjustField(newWidth, newHeight, oldHeight-1, oldWidth);
         this.adjustPlayers(oldWidth, oldHeight, false);
 
-        this.paused = false;
+        this.paused = prev;
     }
 
-    // Increase field size and transfer old data + update all players
-    this.shrinkField = function() {
+    // Decrease field size and transfer old data + update all players
+    shrinkField() {
+        if (this.fixed) return;
+
+        const prev = this.paused;
         this.paused = true;
         this.maxPlayers--;
         // Store old field size to be able to adjust players
-        var oldWidth = this.field_width;
-        var oldHeight = this.field_height;
+        const oldWidth = this.fieldWidth;
+        const oldHeight = this.fieldHeight;
         // Compute new field size
-        var newWidth = oldWidth - PLAYER_OFFSET > MIN_WIDTH ? oldWidth - PLAYER_OFFSET : MIN_WIDTH;
-        var newHeight = oldHeight - Math.floor(PLAYER_OFFSET/2) > MIN_HEIGHT ? oldHeight - Math.floor(PLAYER_OFFSET/2) : MIN_HEIGHT;
+        const newWidth = oldWidth - PLAYER_OFFSET > MIN_WIDTH ?
+            oldWidth - PLAYER_OFFSET :
+            MIN_WIDTH;
+        const newHeight = oldHeight - Math.floor(PLAYER_OFFSET/2) > MIN_HEIGHT ?
+            oldHeight - Math.floor(PLAYER_OFFSET/2) :
+            MIN_HEIGHT;
 
         this.field = this.adjustField(newWidth, newHeight, newHeight-1, newWidth);
         this.adjustPlayers(oldWidth, oldHeight, true);
-        this.paused = false;
+
+        this.paused = prev;
     }
 
     // Transfer old field data to new larger/smaller field
-    this.adjustField = function(width, height, limitV, limitH, shrink) {
-        var newField =  new Array(width * height);
+    adjustField(width, height, limitV, limitH, shrink) {
+        const newField = new Array(width * height);
         newField.fill(0);
 
         // Clear list of rows holding immortal stones
         if (shrink)
             this.solids.clear();
 
-        var stop = false;
+        let stop = false;
         // Difference in height between new and old field
-        var diff = shrink ? 0 : Math.abs(height - this.field_height);
+        let diff = shrink ? 0 : Math.abs(height - this.fieldHeight);
         // Starting from the bottom of the old field when the new field is bigger
         // or the bottom of the new field when the new field is smaller: copy data
-        for (i = limitV; i >= 0 && !stop; i--) {
-            var empty = 0;
+        for (let i = limitV; i >= 0 && !stop; i--) {
+            let empty = 0;
             // Check all fields of the current row
-            for (j = 0; j < limitH; j++) {
+            for (let j = 0; j < limitH; j++) {
                 // If we are shrinking and there is an immortal stone in this row
                 // add its row to the list of rows holding immortal stones
-                if (shrink && this.field[(i * this.field_width) + j] === SOLID_STONE) {
+                if (shrink && this.field[(i * this.fieldWidth) + j] === SOLID_STONE) {
                     this.solids.add(i);
                 }
                 // If the field is not empty or holds an immortal and we are NOT
                 // shrinking, then we copy this field
-                else if (this.field[(i * this.field_width) + j] > 0) {
-                    newField[((i + diff) * width) + j] = this.field[(i * this.field_width) + j];
-                }
-                // If the field is empty increment the optimization counter
-                else {
+                else if (this.field[(i * this.fieldWidth) + j] > 0) {
+                    newField[((i + diff) * width) + j] = this.field[(i * this.fieldWidth) + j];
+                } else {
+                    // If the field is empty increment the optimization counter
                     empty++
                     // If we find an empty row we can stop, there
                     // can be no other static stones above this row
-                    if (empty == this.field_width)
+                    if (empty == this.fieldWidth)
                         stop = true;
                 }
             }
         }
         // Set new width and height
-        this.field_width = width;
-        this.field_height = height;
+        this.fieldWidth = width;
+        this.fieldHeight = height;
 
         return newField;
     }
 
     // Reposition playerstones to fit the new field
-    this.adjustPlayers = function(width, height, shrink) {
+    adjustPlayers(width, height, shrink) {
         // Difference between old and new field width
-        var diff = Math.abs(width - this.field_width);
-        for (i = 0; i < this.stones.length; i++) {
-            var cancel = false;
-            var setStatic = false;
+        const diff = Math.abs(width - this.fieldWidth);
+        for (let i = 0; i < this.stones.length; i++) {
+            let cancel = false;
+            let setStatic = false;
             // Check all single stones
-            for (j = 0; j < 4 && !cancel && this.stones[i].pos[j] != -1; j++) {
+            for (let j = 0; j < 4 && !cancel && this.stones[i].pos[j] != -1; j++) {
                 // Compute the row this stone was in in the old field
-                row = Math.floor(this.stones[i].pos[j] / width);
+                let row = Math.floor(this.stones[i].pos[j] / width);
                 if (shrink) {
                     // If we are shrinking and the stone is in the
                     // last row of our new field, mark it as static
-                    if (row === this.field_height-1) {
+                    if (row === this.fieldHeight-1) {
                         setStatic = true;
                     }
                     // If the stone is further down than our new
                     // field's height is, spawn a new stone for
                     // this player and go to the next stone
-                    else if (row > this.field_height-1) {
+                    else if (row > this.fieldHeight-1) {
                         this.spawnStone(i);
                         setStatic = false;
                         cancel = true;
@@ -417,574 +569,548 @@ module.exports.room = function() {
     // Called when stone of user width id 'userid' reached
     // the current bottom of the field
     // Checks whether any rows need to be deleted
-    this.stonefinished = function(userid) {
-        var stop = false;
-        // From bottom to top check all rows
-        for (i = this.field_height-1; i >= 0 && !stop; i--) {
-            // Count of empty fields in this row
-            var empty = 0;
-            // Count of filled fields in this row
-            var full = 0;
-            for (j = this.field_width-1; j >= 0; j--) {
-                // If there is a filled field and there is no
+    stonefinished(userid) {
+        let stop = false;
+        let numFullRows = 0;
+        // from bottom to top check all rows
+        for (let i = this.fieldHeight-1; i >= 0 && !stop; i--) {
+            // count of empty/filled fields in this row
+            let empty = 0, full = 0;
+
+            for (let j = this.fieldWidth-1; j >= 0; j--) {
+                // if there is a filled field and there is no
                 // immortal stone in this row
-                if (this.field[i * this.field_width + j] > 0 && !this.solids.has(i)) {
+                if (this.field[i * this.fieldWidth + j] > 0 && !this.solids.has(i)) {
                     full++;
                     // When the whole row is full
-                    if (full === this.field_width) {
-                        var change = false;
-                        this.updateScoreLevel();
-                        for (k = 0; k < i; k++) {
-                            var emptyRow = 0;
+                    if (full === this.fieldWidth) {
+                        numFullRows++;
+                        let change = false;
+                        for (let k = 0; k < i; k++) {
+                            let emptyRow = 0;
                             // If there is no immortal stone is in this row, destroy it
                             if (!this.solids.has(i-k)) {
                                 change = true;
-                                for (l = 0; l < this.field_width; l++) {
-                                    emptyRow += this.field[(i - k - 1) * this.field_width + l];
-                                    this.field[(i - k) * this.field_width + l] = this.field[(i - k - 1) * this.field_width + l];
+                                for (let l = 0; l < this.fieldWidth; l++) {
+                                    emptyRow += this.field[(i - k - 1) * this.fieldWidth + l];
+                                    this.field[(i - k) * this.fieldWidth + l] = this.field[(i - k - 1) * this.fieldWidth + l];
                                 }
-                                // If the row was empty stop checking
-                                if (emptyRow === 0)
+                                // if the row was empty stop checking
+                                if (emptyRow === 0) {
                                     k = i;
+                                }
                             }
                         }
-                        // If a row was deleted the row index must not change
+                        // if a row was deleted the row index must not change
                         // because the our current row is now one of the former above rows
                         i = change ? i + 1 : i;
                     }
                 }
                 // If the field is empty
-                else if (this.field[i * this.field_width + j] === 0) {
+                else if (this.field[i * this.fieldWidth + j] === 0) {
                     empty++;
                     // When there are empty and filled fields in this row
                     // we can skip this row, it cannot be deleted, but there
                     // may be other above of it that can
-                    if (full > 0)
+                    if (full > 0) {
                         j = -1;
+                    }
                     // If we found a completely empty row we can stop checking
-                    else if (empty === this.field_width)
+                    else if (empty === this.fieldWidth) {
                         stop = true;
+                    }
                 }
             }
         }
+        this.updateScoreLevel(userid, numFullRows);
         // Spawn a new stone for the user with id 'userid'
         this.spawnStone(userid);
     }
 
-    this.updateScoreLevel = function() {
-        var diff = Math.abs(Math.floor(this.score / 200) - Math.floor((this.score + (this.field_width * this.multiplier)) / 200));
-        if (diff > 0) {
-            this.score += this.field_width * this.multiplier;
-            this.level += diff;
-            this.setSpeed();
-            this.callSpeedCallback();
-        } else {
-            this.score += this.field_width * this.multiplier;
+    updateScoreLevel(userid, rows) {
+        if (rows <= 0) return;
+
+        const newScore = this.getUser(userid).updateScore(
+            BASE_SCORE * this.multiplier + (rows-1) * ROW_SCORE
+        );
+        if (newScore > this.levelScore()) {
+            this.level++;
+            this.updateSpeed();
+            this.stopGameLoop();
+            this.setGameLoop();
         }
     }
 
-    this.setStaticStone = function(userid) {
-        for (i = 0; i < 4 && this.stones[userid].pos[i] != -1; i++) {
-            if (this.field[this.stones[userid].pos[i]] > 0)
+    levelScore() {
+        return this.level * 1000;
+    }
+
+    setStaticStone(userid) {
+        for (let i = 0; i < 4 && this.stones[userid].pos[i] != -1; i++) {
+            if (this.field[this.stones[userid].pos[i]] > 0) {
                 this.spawnSolidStone(this.stones[userid].pos[i])
-            else
+            } else {
                 this.field[this.stones[userid].pos[i]] = userid + 1;
+            }
         }
         this.stateChanged = true;
     }
 
-    this.spawnSolidStone = function(pos) {
-        this.field[pos] = SOLID_STONE;
-        this.solids.add(Math.floor(pos / this.field_width));
+    spawnSolidStone(pos) {
+        this.field[pos] = Stone.solid();
+        this.solids.add(Math.floor(pos / this.fieldWidth));
     }
 
-    this.spawnStone = function(userid) {
-        // Roll the dice to decide which form the stone has (1-10)
+    spawnStone(userid) {
+        // roll the dice to decide which form the stone has (1-10)
         this.stones[userid].kind = Math.floor((Math.random() * 10) + 1);
-        // No rotation
+        // no rotation
         this.stones[userid].rotation = 1;
-        // Compute the starting position of the new stone
+        // compute the starting position of the new stone
         this.setStartPosition(userid);
-        // Create a new stone
+        // create a new stone
         this.getNewStone(userid);
     }
 
-    this.getNewStone = function(userid) {
-        var at = this.stones[userid].start;
-
-        switch (this.stones[userid].kind) {
-            case 1:
-                this.stones[userid].pos = [(this.field_width / 2) - 1 + at, (this.field_width / 2) + at, -1, -1];
-                break;
-            case 2:
-                this.stones[userid].pos = [(this.field_width / 2) - 1 + at, (this.field_width / 2) + at, (this.field_width / 2) + 1 + at, -1];
-                break;
-            case 3:
-                this.stones[userid].pos = [(this.field_width / 2) - 1 + at, (this.field_width / 2) + at, (this.field_width / 2) + 1 + at, (this.field_width / 2) + 2 + at];
-                break;
-            case 4:
-                this.stones[userid].pos = [(this.field_width / 2) - 1 + at, this.field_width / 2 + at, this.field_width / 2 + 1 + at, this.field_width / 2 + this.field_width + at];
-                break;
-            case 5:
-                this.stones[userid].pos = [(this.field_width / 2) - 1 + at, this.field_width / 2 + at, this.field_width / 2 - 1 + this.field_width + at, this.field_width / 2 + this.field_width + at];
-                break;
-            case 6:
-                this.stones[userid].pos = [(this.field_width / 2) - 1 + at, this.field_width / 2 - 1 + this.field_width + at, this.field_width / 2 + this.field_width + at, this.field_width / 2 + 1 + this.field_width + at];
-                break;
-            case 7:
-                this.stones[userid].pos = [(this.field_width / 2) - 1 + at, this.field_width / 2 + at, this.field_width / 2 + 1 + at, this.field_width / 2 - 1 + this.field_width + at];
-                break;
-            case 8:
-                this.stones[userid].pos = [(this.field_width / 2) - 1 + at, this.field_width / 2 + at, this.field_width / 2 - 1 + this.field_width + at, -1];
-                break;
-            case 9:
-                this.stones[userid].pos = [(this.field_width / 2) + at, (this.field_width / 2) + 1 + at, this.field_width / 2 - 1 + this.field_width + at, this.field_width / 2 + this.field_width + at];
-                break;
-            case 10:
-                this.stones[userid].pos = [(this.field_width / 2) - 1 + at, (this.field_width / 2) + at, this.field_width / 2 + this.field_width + at, this.field_width / 2 + 1 + this.field_width + at];
-                break;
-        }
+    getNewStone(userid) {
+        this.stones[userid].setPosition(this.fieldWidth);
     }
 
-    this.movestone = function(key, userid) {
-        if (this.paused)
-            return;
+    movestone(key, userid) {
+        if (this.paused) return;
 
+        const stone = this.stones[userid];
         // Turn Left (Q)
-        if (key === 81) {
-            switch (this.stones[userid].kind) {
+        if (key === KEYS.rotateLeft) {
+            switch (stone.kind) {
                 case 1: // OX
-                    if (this.stones[userid].rotation === 1 && this.field[this.stones[userid].pos[0] - this.field_width] === 0) {
-                        this.stones[userid].pos[1] = this.stones[userid].pos[0] - this.field_width;
-                    } else if (this.stones[userid].rotation === 2 && this.field[this.stones[userid].pos[0] - 1] === 0) {
-                        if (this.stones[userid].pos[0] % this.field_width === 0) {
-                            this.stones[userid].pos[1] = this.stones[userid].pos[0];
-                            this.stones[userid].pos[0]++;
+                    if (stone.rotation === 1 && this.field[stone.pos[0] - this.fieldWidth] === 0) {
+                        stone.pos[1] = stone.pos[0] - this.fieldWidth;
+                    } else if (stone.rotation === 2 && this.field[stone.pos[0] - 1] === 0) {
+                        if (stone.pos[0] % this.fieldWidth === 0) {
+                            stone.pos[1] = stone.pos[0];
+                            stone.pos[0]++;
                         } else {
-                            this.stones[userid].pos[1] = this.stones[userid].pos[0] - 1;
+                            stone.pos[1] = stone.pos[0] - 1;
                         }
-                    } else if (this.stones[userid].rotation === 3 && this.field[this.stones[userid].pos[0] + this.field_width] === 0) {
-                        this.stones[userid].pos[1] = this.stones[userid].pos[0] + this.field_width;
-                    } else if (this.stones[userid].rotation === 4 && this.field[this.stones[userid].pos[0] + 1] === 0) {
-                        if (this.stones[userid].pos[0] % this.field_width === (this.field_width - 1)) {
-                            this.stones[userid].pos[1] = this.stones[userid].pos[0];
-                            this.stones[userid].pos[0]--;
+                    } else if (stone.rotation === 3 && this.field[stone.pos[0] + this.fieldWidth] === 0) {
+                        stone.pos[1] = stone.pos[0] + this.fieldWidth;
+                    } else if (stone.rotation === 4 && this.field[stone.pos[0] + 1] === 0) {
+                        if (stone.pos[0] % this.fieldWidth === (this.fieldWidth - 1)) {
+                            stone.pos[1] = stone.pos[0];
+                            stone.pos[0]--;
                         } else {
-                            this.stones[userid].pos[1] = this.stones[userid].pos[0] + 1;
+                            stone.pos[1] = stone.pos[0] + 1;
                         }
                     } else
                         break;
-                    this.stones[userid].rotation = this.stones[userid].rotation === 4 ? 1 : this.stones[userid].rotation+1;
+                    stone.rotation = stone.rotation === 4 ? 1 : stone.rotation+1;
                     break;
                 case 2: // XOX
-                    if (this.stones[userid].rotation === 1 && this.field[this.stones[userid].pos[1] - this.field_width] === 0 && this.field[this.stones[userid].pos[0] + this.field_width] === 0) {
-                        this.stones[userid].pos[0] = this.stones[userid].pos[1] - this.field_width;
-                        this.stones[userid].pos[2] = this.stones[userid].pos[1] + this.field_width;
-                        this.stones[userid].rotation = 2;
-                    } else if (this.stones[userid].rotation === 2 && this.field[this.stones[userid].pos[1] - 1] === 0 && this.field[this.stones[userid].pos[1] + 1] === 0) {
-                        if (this.stones[userid].pos[1] % this.field_width === 0) {
-                            this.stones[userid].pos[0] = this.stones[userid].pos[1];
-                            this.stones[userid].pos[1]++;
-                            this.stones[userid].pos[2] = this.stones[userid].pos[1] + 1;
-                        } else if (this.stones[userid].pos[1] % this.field_width === (this.field_width-1)) {
-                            this.stones[userid].pos[2] = this.stones[userid].pos[1];
-                            this.stones[userid].pos[1]--;
-                            this.stones[userid].pos[0] = this.stones[userid].pos[1] - 1;
+                    if (stone.rotation === 1 && this.field[stone.pos[1] - this.fieldWidth] === 0 && this.field[stone.pos[0] + this.fieldWidth] === 0) {
+                        stone.pos[0] = stone.pos[1] - this.fieldWidth;
+                        stone.pos[2] = stone.pos[1] + this.fieldWidth;
+                        stone.rotation = 2;
+                    } else if (stone.rotation === 2 && this.field[stone.pos[1] - 1] === 0 && this.field[stone.pos[1] + 1] === 0) {
+                        if (stone.pos[1] % this.fieldWidth === 0) {
+                            stone.pos[0] = stone.pos[1];
+                            stone.pos[1]++;
+                            stone.pos[2] = stone.pos[1] + 1;
+                        } else if (stone.pos[1] % this.fieldWidth === (this.fieldWidth-1)) {
+                            stone.pos[2] = stone.pos[1];
+                            stone.pos[1]--;
+                            stone.pos[0] = stone.pos[1] - 1;
                         } else {
-                            this.stones[userid].pos[0] = this.stones[userid].pos[1] - 1;
-                            this.stones[userid].pos[2] = this.stones[userid].pos[1] + 1;
+                            stone.pos[0] = stone.pos[1] - 1;
+                            stone.pos[2] = stone.pos[1] + 1;
                         }
-                        this.stones[userid].rotation = 1;
+                        stone.rotation = 1;
                     } break;
                 case 3: // XOXX
-                    if (this.stones[userid].rotation === 1 && this.field[this.stones[userid].pos[0] + (this.field_width + 1)] === 0 && this.field[this.stones[userid].pos[2] - (this.field_width + 1)] === 0 && this.field[this.stones[userid].pos[3] - 2 * (this.field_width + 1)] === 0) {
-                        this.stones[userid].pos[0] += (this.field_width + 1);
-                        this.stones[userid].pos[2] -= (this.field_width + 1);
-                        this.stones[userid].pos[3] -= 2 * (this.field_width + 1);
-                    } else if (this.stones[userid].rotation === 2 && this.field[this.stones[userid].pos[1] - 1] === 0 &&
-                               this.field[this.stones[userid].pos[1] - 2] === 0 && this.field[this.stones[userid].pos[1] + 1] === 0) {
-                        if (this.stones[userid].pos[1] % this.field_width === 0) {
-                            this.stones[userid].pos[1] += 2;
+                    if (stone.rotation === 1 && this.field[stone.pos[0] + (this.fieldWidth + 1)] === 0 && this.field[stone.pos[2] - (this.fieldWidth + 1)] === 0 && this.field[stone.pos[3] - 2 * (this.fieldWidth + 1)] === 0) {
+                        stone.pos[0] += (this.fieldWidth + 1);
+                        stone.pos[2] -= (this.fieldWidth + 1);
+                        stone.pos[3] -= 2 * (this.fieldWidth + 1);
+                    } else if (stone.rotation === 2 && this.field[stone.pos[1] - 1] === 0 &&
+                               this.field[stone.pos[1] - 2] === 0 && this.field[stone.pos[1] + 1] === 0) {
+                        if (stone.pos[1] % this.fieldWidth === 0) {
+                            stone.pos[1] += 2;
                         }
-                        this.stones[userid].pos[0] = this.stones[userid].pos[1] + 1;
-                        this.stones[userid].pos[2] = this.stones[userid].pos[1] - 1;
-                        this.stones[userid].pos[3] = this.stones[userid].pos[1] - 2;
-                    } else if (this.stones[userid].rotation === 3 && this.field[this.stones[userid].pos[1] + this.field_width] === 0 &&
-                               this.field[this.stones[userid].pos[1] + (2 * this.field_width)] === 0 && this.field[this.stones[userid].pos[1] - this.field_width] === 0) {
-                        this.stones[userid].pos[0] = this.stones[userid].pos[1] - this.field_width;
-                        this.stones[userid].pos[2] = this.stones[userid].pos[1] + this.field_width;
-                        this.stones[userid].pos[3] = this.stones[userid].pos[1] + (this.field_width * 2);
-                    } else if (this.stones[userid].rotation === 4 && this.field[this.stones[userid].pos[1] - 1] === 0 &&
-                               this.field[this.stones[userid].pos[1] + 1] === 0 && this.field[this.stones[userid].pos[1] + 2] === 0) {
-                        if (this.stones[userid].pos[1] % this.field_width === (this.field_width - 1)) {
-                            this.stones[userid].pos[1] -= 2;
+                        stone.pos[0] = stone.pos[1] + 1;
+                        stone.pos[2] = stone.pos[1] - 1;
+                        stone.pos[3] = stone.pos[1] - 2;
+                    } else if (stone.rotation === 3 && this.field[stone.pos[1] + this.fieldWidth] === 0 &&
+                               this.field[stone.pos[1] + (2 * this.fieldWidth)] === 0 && this.field[stone.pos[1] - this.fieldWidth] === 0) {
+                        stone.pos[0] = stone.pos[1] - this.fieldWidth;
+                        stone.pos[2] = stone.pos[1] + this.fieldWidth;
+                        stone.pos[3] = stone.pos[1] + (this.fieldWidth * 2);
+                    } else if (stone.rotation === 4 && this.field[stone.pos[1] - 1] === 0 &&
+                               this.field[stone.pos[1] + 1] === 0 && this.field[stone.pos[1] + 2] === 0) {
+                        if (stone.pos[1] % this.fieldWidth === (this.fieldWidth - 1)) {
+                            stone.pos[1] -= 2;
                         }
-                        this.stones[userid].pos[0] = this.stones[userid].pos[1] - 1;
-                        this.stones[userid].pos[2] = this.stones[userid].pos[1] + 1;
-                        this.stones[userid].pos[3] = this.stones[userid].pos[1] + 2;
+                        stone.pos[0] = stone.pos[1] - 1;
+                        stone.pos[2] = stone.pos[1] + 1;
+                        stone.pos[3] = stone.pos[1] + 2;
                     } else {
                         break;
                     }
-                    this.stones[userid].rotation === 4 ? this.stones[userid].rotation = 1 : this.stones[userid].rotation++;
+                    stone.rotation === 4 ? stone.rotation = 1 : stone.rotation++;
                     break;
                 case 4: // T XOX
-                    if (this.stones[userid].rotation === 1 && this.field[this.stones[userid].pos[1] - this.field_width] === 0) {
-                        this.stones[userid].pos[0] = this.stones[userid].pos[1] - this.field_width;
-                    } else if (this.stones[userid].rotation === 2 && this.field[this.stones[userid].pos[1] - 1] === 0) {
-                        if (this.stones[userid].pos[1] % this.field_width === 0) {
-                            this.stones[userid].pos[1]++;
-                            this.stones[userid].pos[2]++;
+                    if (stone.rotation === 1 && this.field[stone.pos[1] - this.fieldWidth] === 0) {
+                        stone.pos[0] = stone.pos[1] - this.fieldWidth;
+                    } else if (stone.rotation === 2 && this.field[stone.pos[1] - 1] === 0) {
+                        if (stone.pos[1] % this.fieldWidth === 0) {
+                            stone.pos[1]++;
+                            stone.pos[2]++;
                         }
-                        this.stones[userid].pos[0] = this.stones[userid].pos[1] - 1;
-                        this.stones[userid].pos[3] = this.stones[userid].pos[1] - this.field_width;
-                    } else if (this.stones[userid].rotation === 3 && this.field[this.stones[userid].pos[1] + this.field_width] === 0) {
-                        this.stones[userid].pos[2] = this.stones[userid].pos[1] + this.field_width;
-                    } else if (this.stones[userid].rotation === 4 && this.field[this.stones[userid].pos[1] + 1] === 0) {
-                        this.stones[userid].pos[2] = this.stones[userid].pos[1] + 1;
-                        this.stones[userid].pos[3] = this.stones[userid].pos[1] + this.field_width;
+                        stone.pos[0] = stone.pos[1] - 1;
+                        stone.pos[3] = stone.pos[1] - this.fieldWidth;
+                    } else if (stone.rotation === 3 && this.field[stone.pos[1] + this.fieldWidth] === 0) {
+                        stone.pos[2] = stone.pos[1] + this.fieldWidth;
+                    } else if (stone.rotation === 4 && this.field[stone.pos[1] + 1] === 0) {
+                        stone.pos[2] = stone.pos[1] + 1;
+                        stone.pos[3] = stone.pos[1] + this.fieldWidth;
                     } else {
                         break;
                     }
-                    this.stones[userid].rotation === 4 ? this.stones[userid].rotation = 1 : this.stones[userid].rotation++;
+                    stone.rotation === 4 ? stone.rotation = 1 : stone.rotation++;
                     break;
                 case 6: // J - Inverse L
-                    if (this.stones[userid].rotation === 1 && this.field[this.stones[userid].pos[1] - 1] === 0 && this.field[this.stones[userid].pos[0] - this.field_width] === 0) {
-                        if (this.stones[userid].pos[1] % this.field_width === 0) {
-                            this.stones[userid].pos[1]++;
-                            this.stones[userid].pos[0]++;
+                    if (stone.rotation === 1 && this.field[stone.pos[1] - 1] === 0 && this.field[stone.pos[0] - this.fieldWidth] === 0) {
+                        if (stone.pos[1] % this.fieldWidth === 0) {
+                            stone.pos[1]++;
+                            stone.pos[0]++;
                         }
-                        this.stones[userid].pos[3] = this.stones[userid].pos[1] - 1;
-                        this.stones[userid].pos[2] = this.stones[userid].pos[0] - this.field_width;
-                    } else if (this.stones[userid].rotation === 2 && this.field[this.stones[userid].pos[1] + this.field_width] === 0 && this.field[this.stones[userid].pos[3] - 1] === 0) {
-                        if (this.stones[userid].pos[3] % this.field_width === 0) {
-                            this.stones[userid].pos[3]++;
-                            this.stones[userid].pos[1]++;
+                        stone.pos[3] = stone.pos[1] - 1;
+                        stone.pos[2] = stone.pos[0] - this.fieldWidth;
+                    } else if (stone.rotation === 2 && this.field[stone.pos[1] + this.fieldWidth] === 0 && this.field[stone.pos[3] - 1] === 0) {
+                        if (stone.pos[3] % this.fieldWidth === 0) {
+                            stone.pos[3]++;
+                            stone.pos[1]++;
                         }
-                        this.stones[userid].pos[0] = this.stones[userid].pos[1] + this.field_width;
-                        this.stones[userid].pos[2] = this.stones[userid].pos[3] - 1;
-                    } else if (this.stones[userid].rotation === 3 && this.field[this.stones[userid].pos[0] + this.field_width] === 0 && this.field[this.stones[userid].pos[1] + 1] === 0) {
-                        if (this.stones[userid].pos[1] % this.field_width === (this.field_width - 1)) {
-                            this.stones[userid].pos[1]--;
-                            this.stones[userid].pos[0]--;
+                        stone.pos[0] = stone.pos[1] + this.fieldWidth;
+                        stone.pos[2] = stone.pos[3] - 1;
+                    } else if (stone.rotation === 3 && this.field[stone.pos[0] + this.fieldWidth] === 0 && this.field[stone.pos[1] + 1] === 0) {
+                        if (stone.pos[1] % this.fieldWidth === (this.fieldWidth - 1)) {
+                            stone.pos[1]--;
+                            stone.pos[0]--;
                         }
-                        this.stones[userid].pos[2] = this.stones[userid].pos[1] + 1;
-                        this.stones[userid].pos[3] = this.stones[userid].pos[0] + this.field_width;
-                    } else if (this.stones[userid].rotation === 4 && this.field[this.stones[userid].pos[2] + 1] === 0 && this.field[this.stones[userid].pos[1] - this.field_width] === 0) {
-                        if (this.stones[userid].pos[2] % this.field_width === (this.field_width - 1)) {
-                            this.stones[userid].pos[2]--;
-                            this.stones[userid].pos[1]--;
+                        stone.pos[2] = stone.pos[1] + 1;
+                        stone.pos[3] = stone.pos[0] + this.fieldWidth;
+                    } else if (stone.rotation === 4 && this.field[stone.pos[2] + 1] === 0 && this.field[stone.pos[1] - this.fieldWidth] === 0) {
+                        if (stone.pos[2] % this.fieldWidth === (this.fieldWidth - 1)) {
+                            stone.pos[2]--;
+                            stone.pos[1]--;
                         }
-                        this.stones[userid].pos[0] = this.stones[userid].pos[1] - this.field_width;
-                        this.stones[userid].pos[3] = this.stones[userid].pos[2] + 1;
+                        stone.pos[0] = stone.pos[1] - this.fieldWidth;
+                        stone.pos[3] = stone.pos[2] + 1;
                     } else {
                         break;
                     }
-                    this.stones[userid].rotation === 4 ? this.stones[userid].rotation = 1 : this.stones[userid].rotation++;
+                    stone.rotation === 4 ? stone.rotation = 1 : stone.rotation++;
                     break;
                 case 7: // L
-                    if (this.stones[userid].rotation === 1 && this.field[this.stones[userid].pos[0] - this.field_width] === 0 && this.field[this.stones[userid].pos[0] - (2 * this.field_width)] === 0) {
-                        this.stones[userid].pos[2] = this.stones[userid].pos[0] - this.field_width;
-                        this.stones[userid].pos[3] = this.stones[userid].pos[2] - this.field_width;
-                    } else if (this.stones[userid].rotation === 2 && this.field[this.stones[userid].pos[0] - 1] === 0 && this.field[this.stones[userid].pos[0] - 2] === 0) {
-                        if (this.stones[userid].pos[0] % this.field_width === 0) {
-                            this.stones[userid].pos[0] += 2;
-                            this.stones[userid].pos[2] += 2;
+                    if (stone.rotation === 1 && this.field[stone.pos[0] - this.fieldWidth] === 0 && this.field[stone.pos[0] - (2 * this.fieldWidth)] === 0) {
+                        stone.pos[2] = stone.pos[0] - this.fieldWidth;
+                        stone.pos[3] = stone.pos[2] - this.fieldWidth;
+                    } else if (stone.rotation === 2 && this.field[stone.pos[0] - 1] === 0 && this.field[stone.pos[0] - 2] === 0) {
+                        if (stone.pos[0] % this.fieldWidth === 0) {
+                            stone.pos[0] += 2;
+                            stone.pos[2] += 2;
                         }
-                        this.stones[userid].pos[1] = this.stones[userid].pos[0] - 1;
-                        this.stones[userid].pos[3] = this.stones[userid].pos[0] - 2;
-                    } else if (this.stones[userid].rotation === 3 && this.field[this.stones[userid].pos[0] + this.field_width] === 0 && this.field[this.stones[userid].pos[0] + (2 * this.field_width)] === 0) {
-                        this.stones[userid].pos[2] = this.stones[userid].pos[0] + this.field_width;
-                        this.stones[userid].pos[3] = this.stones[userid].pos[2] + this.field_width;
-                    } else if (this.stones[userid].rotation === 4 && this.field[this.stones[userid].pos[0] + 1] === 0 && this.field[this.stones[userid].pos[0] + 2] === 0) {
-                        if (this.stones[userid].pos[0] % this.field_width === (this.field_width-1)) {
-                            this.stones[userid].pos[0] -= 2;
-                        } else if (this.stones[userid].pos[0] % this.field_width === (this.field_width-2)) {
-                            this.stones[userid].pos[0]--;
+                        stone.pos[1] = stone.pos[0] - 1;
+                        stone.pos[3] = stone.pos[0] - 2;
+                    } else if (stone.rotation === 3 && this.field[stone.pos[0] + this.fieldWidth] === 0 && this.field[stone.pos[0] + (2 * this.fieldWidth)] === 0) {
+                        stone.pos[2] = stone.pos[0] + this.fieldWidth;
+                        stone.pos[3] = stone.pos[2] + this.fieldWidth;
+                    } else if (stone.rotation === 4 && this.field[stone.pos[0] + 1] === 0 && this.field[stone.pos[0] + 2] === 0) {
+                        if (stone.pos[0] % this.fieldWidth === (this.fieldWidth-1)) {
+                            stone.pos[0] -= 2;
+                        } else if (stone.pos[0] % this.fieldWidth === (this.fieldWidth-2)) {
+                            stone.pos[0]--;
                         }
-                        this.stones[userid].pos[1] = this.stones[userid].pos[0] + 1;
-                        this.stones[userid].pos[2] = this.stones[userid].pos[0] + 2;
-                        this.stones[userid].pos[3] = this.stones[userid].pos[0] + this.field_width;
+                        stone.pos[1] = stone.pos[0] + 1;
+                        stone.pos[2] = stone.pos[0] + 2;
+                        stone.pos[3] = stone.pos[0] + this.fieldWidth;
                     } else {
                         break;
                     }
-                    this.stones[userid].rotation === 4 ? this.stones[userid].rotation = 1 : this.stones[userid].rotation++;
+                    stone.rotation === 4 ? stone.rotation = 1 : stone.rotation++;
                     break;
                 case 8: // kleines L
-                    if (this.stones[userid].rotation === 1 && this.field[this.stones[userid].pos[0] - this.field_width] === 0) {
-                        this.stones[userid].pos[2] = this.stones[userid].pos[0] - this.field_width;
-                    } else if (this.stones[userid].rotation === 2 && this.field[this.stones[userid].pos[0] - 1] === 0) {
-                        if (this.stones[userid].pos[0] % this.field_width === 0) {
-                            this.stones[userid].pos[0]++;
-                            this.stones[userid].pos[2]++;
+                    if (stone.rotation === 1 && this.field[stone.pos[0] - this.fieldWidth] === 0) {
+                        stone.pos[2] = stone.pos[0] - this.fieldWidth;
+                    } else if (stone.rotation === 2 && this.field[stone.pos[0] - 1] === 0) {
+                        if (stone.pos[0] % this.fieldWidth === 0) {
+                            stone.pos[0]++;
+                            stone.pos[2]++;
                         }
-                        this.stones[userid].pos[1] = this.stones[userid].pos[0] - 1;
-                    } else if (this.stones[userid].rotation === 3 && this.field[this.stones[userid].pos[0] + this.field_width] === 0) {
-                        this.stones[userid].pos[2] = this.stones[userid].pos[0] + this.field_width;
-                    } else if (this.stones[userid].rotation === 4 && this.field[this.stones[userid].pos[0] + 1] === 0) {
-                        this.stones[userid].pos[1] = this.stones[userid].pos[0] + 1;
+                        stone.pos[1] = stone.pos[0] - 1;
+                    } else if (stone.rotation === 3 && this.field[stone.pos[0] + this.fieldWidth] === 0) {
+                        stone.pos[2] = stone.pos[0] + this.fieldWidth;
+                    } else if (stone.rotation === 4 && this.field[stone.pos[0] + 1] === 0) {
+                        stone.pos[1] = stone.pos[0] + 1;
                     } else {
                         break;
                     }
-                    this.stones[userid].rotation === 4 ? this.stones[userid].rotation = 1 : this.stones[userid].rotation++;
+                    stone.rotation === 4 ? stone.rotation = 1 : stone.rotation++;
                     break;
                 case 9: // S
-                    if (this.stones[userid].rotation === 1 && this.field[this.stones[userid].pos[2] + 2] === 0 && this.field[this.stones[userid].pos[3] - 2 * this.field_width] === 0) {
-                        this.stones[userid].pos[2] += 2;
-                        this.stones[userid].pos[3] -= 2 * this.field_width;
-                        this.stones[userid].rotation = 2;
-                    } else if (this.stones[userid].rotation === 2 && this.field[this.stones[userid].pos[2] - 2] === 0 && this.field[this.stones[userid].pos[3] + 2 * this.field_width] === 0) {
-                        this.stones[userid].pos[2] -= 2;
-                        this.stones[userid].pos[3] += 2 * this.field_width;
-                        this.stones[userid].rotation = 1;
+                    if (stone.rotation === 1 && this.field[stone.pos[2] + 2] === 0 && this.field[stone.pos[3] - 2 * this.fieldWidth] === 0) {
+                        stone.pos[2] += 2;
+                        stone.pos[3] -= 2 * this.fieldWidth;
+                        stone.rotation = 2;
+                    } else if (stone.rotation === 2 && this.field[stone.pos[2] - 2] === 0 && this.field[stone.pos[3] + 2 * this.fieldWidth] === 0) {
+                        stone.pos[2] -= 2;
+                        stone.pos[3] += 2 * this.fieldWidth;
+                        stone.rotation = 1;
                     } break;
                 case 10: // Z
-                    if (this.stones[userid].rotation === 1 && this.field[this.stones[userid].pos[0] + 2] === 0 && this.field[this.stones[userid].pos[1] + 2 * this.field_width] === 0) {
-                        this.stones[userid].pos[0] += 2;
-                        this.stones[userid].pos[1] += 2 * this.field_width;
-                        this.stones[userid].rotation = 2;
-                    } else if (this.stones[userid].rotation === 2 && this.field[this.stones[userid].pos[0] - 2] === 0 && this.field[this.stones[userid].pos[1] - 2 * this.field_width] === 0) {
-                        this.stones[userid].pos[0] -= 2;
-                        this.stones[userid].pos[1] -= 2 * this.field_width;
-                        this.stones[userid].rotation = 1;
+                    if (stone.rotation === 1 && this.field[stone.pos[0] + 2] === 0 && this.field[stone.pos[1] + 2 * this.fieldWidth] === 0) {
+                        stone.pos[0] += 2;
+                        stone.pos[1] += 2 * this.fieldWidth;
+                        stone.rotation = 2;
+                    } else if (stone.rotation === 2 && this.field[stone.pos[0] - 2] === 0 && this.field[stone.pos[1] - 2 * this.fieldWidth] === 0) {
+                        stone.pos[0] -= 2;
+                        stone.pos[1] -= 2 * this.fieldWidth;
+                        stone.rotation = 1;
                     } break;
                 default: break;
             }
         // Turn Right (E)
-        } else if (key === 69) {
-            switch (this.stones[userid].kind) {
+        } else if (key === KEYS.rotateRight) {
+            switch (stone.kind) {
                 case 1: // OX
-                    if (this.stones[userid].rotation === 1 && this.field[this.stones[userid].pos[0] + this.field_width] === 0) {
-                        this.stones[userid].pos[1] = this.stones[userid].pos[0] + this.field_width;
-                    } else if (this.stones[userid].rotation === 2 && this.field[this.stones[userid].pos[0] - 1] === 0) {
-                        this.stones[userid].pos[1] = this.stones[userid].pos[0] - 1;
-                    } else if (this.stones[userid].rotation === 3 && this.field[this.stones[userid].pos[0] - this.field_width] === 0) {
-                        this.stones[userid].pos[1] = this.stones[userid].pos[0] - this.field_width;
-                    } else if (this.stones[userid].rotation === 4 && this.field[this.stones[userid].pos[0] + 1] === 0) {
-                        this.stones[userid].pos[1] = this.stones[userid].pos[0] + 1;
+                    if (stone.rotation === 1 && this.field[stone.pos[0] + this.fieldWidth] === 0) {
+                        stone.pos[1] = stone.pos[0] + this.fieldWidth;
+                    } else if (stone.rotation === 2 && this.field[stone.pos[0] - 1] === 0) {
+                        stone.pos[1] = stone.pos[0] - 1;
+                    } else if (stone.rotation === 3 && this.field[stone.pos[0] - this.fieldWidth] === 0) {
+                        stone.pos[1] = stone.pos[0] - this.fieldWidth;
+                    } else if (stone.rotation === 4 && this.field[stone.pos[0] + 1] === 0) {
+                        stone.pos[1] = stone.pos[0] + 1;
                     } else
                         break;
-                    this.stones[userid].rotation === 4 ? this.stones[userid].rotation = 1 : this.stones[userid].rotation++;
+                    stone.rotation === 4 ? stone.rotation = 1 : stone.rotation++;
                     break;
                 case 2: // XOX
-                    if (this.stones[userid].rotation === 1 && this.field[this.stones[userid].pos[0] - (this.field_width - 1)] === 0 && this.field[this.stones[userid].pos[2] + (this.field_width - 1)] === 0) {
-                        this.stones[userid].pos[0] -= (this.field_width - 1);
-                        this.stones[userid].pos[2] += (this.field_width - 1);
-                        this.stones[userid].rotation = 2;
-                    } else if (this.stones[userid].rotation === 2 && this.field[this.stones[userid].pos[0] + (this.field_width - 1)] === 0 && this.field[this.stones[userid].pos[2] - (this.field_width - 1)] === 0) {
-                        this.stones[userid].pos[0] += (this.field_width - 1);
-                        this.stones[userid].pos[2] -= (this.field_width - 1);
-                        this.stones[userid].rotation = 1;
+                    if (stone.rotation === 1 && this.field[stone.pos[0] - (this.fieldWidth - 1)] === 0 && this.field[stone.pos[2] + (this.fieldWidth - 1)] === 0) {
+                        stone.pos[0] -= (this.fieldWidth - 1);
+                        stone.pos[2] += (this.fieldWidth - 1);
+                        stone.rotation = 2;
+                    } else if (stone.rotation === 2 && this.field[stone.pos[0] + (this.fieldWidth - 1)] === 0 && this.field[stone.pos[2] - (this.fieldWidth - 1)] === 0) {
+                        stone.pos[0] += (this.fieldWidth - 1);
+                        stone.pos[2] -= (this.fieldWidth - 1);
+                        stone.rotation = 1;
                     } break;
                 case 3: // XOXX
-                    if (this.stones[userid].rotation === 1 && this.field[this.stones[userid].pos[1] - this.field_width] === 0 &&
-                        this.field[this.stones[userid].pos[1] + this.field_width] === 0 && this.field[this.stones[userid].pos[1] + (2 * this.field_width)] === 0) {
-                        this.stones[userid].pos[0] = this.stones[userid].pos[1] - this.field_width;
-                        this.stones[userid].pos[2] = this.stones[userid].pos[1] + this.field_width;
-                        this.stones[userid].pos[3] = this.stones[userid].pos[1] + (2 * this.field_width);
-                    } else if (this.stones[userid].rotation === 2 && this.field[this.stones[userid].pos[1] - 1] === 0 &&
-                               this.field[this.stones[userid].pos[1] - 2] === 0 && this.field[this.stones[userid].pos[1] + 1] === 0) {
-                        this.stones[userid].pos[0] = this.stones[userid].pos[1] + 1;
-                        this.stones[userid].pos[2] = this.stones[userid].pos[1] - 1;
-                        this.stones[userid].pos[3] = this.stones[userid].pos[1] - 2;
-                    } else if (this.stones[userid].rotation === 3 && this.field[this.stones[userid].pos[1] + this.field_width] === 0 &&
-                               this.field[this.stones[userid].pos[1] - this.field_width] === 0 && this.field[this.stones[userid].pos[1] - (2 * this.field_width)] === 0) {
-                        this.stones[userid].pos[0] = this.stones[userid].pos[1] + this.field_width;
-                        this.stones[userid].pos[2] = this.stones[userid].pos[1] - this.field_width;
-                        this.stones[userid].pos[3] = this.stones[userid].pos[1] - (2 * this.field_width);
-                    } else if (this.stones[userid].rotation === 4 && this.field[this.stones[userid].pos[1] - 1] === 0 &&
-                               this.field[this.stones[userid].pos[1] + 1] === 0 && this.field[this.stones[userid].pos[1] + 2] === 0) {
-                        this.stones[userid].pos[0] = this.stones[userid].pos[1] - 1;
-                        this.stones[userid].pos[2] = this.stones[userid].pos[1] + 1;
-                        this.stones[userid].pos[3] = this.stones[userid].pos[1] + 2;
+                    if (stone.rotation === 1 && this.field[stone.pos[1] - this.fieldWidth] === 0 &&
+                        this.field[stone.pos[1] + this.fieldWidth] === 0 && this.field[stone.pos[1] + (2 * this.fieldWidth)] === 0) {
+                        stone.pos[0] = stone.pos[1] - this.fieldWidth;
+                        stone.pos[2] = stone.pos[1] + this.fieldWidth;
+                        stone.pos[3] = stone.pos[1] + (2 * this.fieldWidth);
+                    } else if (stone.rotation === 2 && this.field[stone.pos[1] - 1] === 0 &&
+                               this.field[stone.pos[1] - 2] === 0 && this.field[stone.pos[1] + 1] === 0) {
+                        stone.pos[0] = stone.pos[1] + 1;
+                        stone.pos[2] = stone.pos[1] - 1;
+                        stone.pos[3] = stone.pos[1] - 2;
+                    } else if (stone.rotation === 3 && this.field[stone.pos[1] + this.fieldWidth] === 0 &&
+                               this.field[stone.pos[1] - this.fieldWidth] === 0 && this.field[stone.pos[1] - (2 * this.fieldWidth)] === 0) {
+                        stone.pos[0] = stone.pos[1] + this.fieldWidth;
+                        stone.pos[2] = stone.pos[1] - this.fieldWidth;
+                        stone.pos[3] = stone.pos[1] - (2 * this.fieldWidth);
+                    } else if (stone.rotation === 4 && this.field[stone.pos[1] - 1] === 0 &&
+                               this.field[stone.pos[1] + 1] === 0 && this.field[stone.pos[1] + 2] === 0) {
+                        stone.pos[0] = stone.pos[1] - 1;
+                        stone.pos[2] = stone.pos[1] + 1;
+                        stone.pos[3] = stone.pos[1] + 2;
                     } else {
                         break;
                     }
-                    this.stones[userid].rotation === 4 ? this.stones[userid].rotation = 1 : this.stones[userid].rotation++;
+                    stone.rotation === 4 ? stone.rotation = 1 : stone.rotation++;
                     break;
                 case 4: // T XOX
-                    if (this.stones[userid].rotation === 1 && this.field[this.stones[userid].pos[1] - this.field_width] === 0) {
-                        this.stones[userid].pos[3] = this.stones[userid].pos[1] - this.field_width;
-                        this.stones[userid].pos[2] = this.stones[userid].pos[1] + this.field_width;
-                    } else if (this.stones[userid].rotation === 2 && this.field[this.stones[userid].pos[1] + 1] === 0) {
-                        if (this.stones[userid].pos[1] % this.field_width === (this.field_width-1)) {
-                            this.stones[userid].pos[1]--;
-                            this.stones[userid].pos[0]--;
+                    if (stone.rotation === 1 && this.field[stone.pos[1] - this.fieldWidth] === 0) {
+                        stone.pos[3] = stone.pos[1] - this.fieldWidth;
+                        stone.pos[2] = stone.pos[1] + this.fieldWidth;
+                    } else if (stone.rotation === 2 && this.field[stone.pos[1] + 1] === 0) {
+                        if (stone.pos[1] % this.fieldWidth === (this.fieldWidth-1)) {
+                            stone.pos[1]--;
+                            stone.pos[0]--;
                         }
-                        this.stones[userid].pos[3] = this.stones[userid].pos[1] - this.field_width;
-                        this.stones[userid].pos[2] = this.stones[userid].pos[1] + 1;
-                    } else if (this.stones[userid].rotation === 3 && this.field[this.stones[userid].pos[1] + this.field_width] === 0) {
-                        this.stones[userid].pos[3] = this.stones[userid].pos[1] + this.field_width;
-                        this.stones[userid].pos[0] = this.stones[userid].pos[1] - this.field_width;
-                    } else if (this.stones[userid].rotation === 4 && this.field[this.stones[userid].pos[1] - 1] === 0) {
-                        this.stones[userid].pos[0] = this.stones[userid].pos[1] - 1;
+                        stone.pos[3] = stone.pos[1] - this.fieldWidth;
+                        stone.pos[2] = stone.pos[1] + 1;
+                    } else if (stone.rotation === 3 && this.field[stone.pos[1] + this.fieldWidth] === 0) {
+                        stone.pos[3] = stone.pos[1] + this.fieldWidth;
+                        stone.pos[0] = stone.pos[1] - this.fieldWidth;
+                    } else if (stone.rotation === 4 && this.field[stone.pos[1] - 1] === 0) {
+                        stone.pos[0] = stone.pos[1] - 1;
                     } else {
                         break;
                     }
-                    this.stones[userid].rotation === 4 ? this.stones[userid].rotation = 1 : this.stones[userid].rotation++;
+                    stone.rotation === 4 ? stone.rotation = 1 : stone.rotation++;
                     break;
                 case 6: // J
-                    if (this.stones[userid].rotation === 1 && this.field[this.stones[userid].pos[1] + this.field_width] === 0 && this.field[this.stones[userid].pos[1] + (2 * this.field_width)] === 0) {
-                        this.stones[userid].pos[0] = this.stones[userid].pos[1] + this.field_width;
-                        this.stones[userid].pos[3] = this.stones[userid].pos[0] + this.field_width;
-                    } else if (this.stones[userid].rotation === 2 && this.field[this.stones[userid].pos[1] - 1] === 0 && this.field[this.stones[userid].pos[1] - 2] === 0) {
-                        if (this.stones[userid].pos[1] % this.field_width === 0) {
-                            this.stones[userid].pos[0] += 2;
-                            this.stones[userid].pos[1] += 2;
-                        } else if (this.stones[userid].pos[1] % this.field_width === 1) {
-                            this.stones[userid].pos[0]++;
-                            this.stones[userid].pos[1]++;
+                    if (stone.rotation === 1 && this.field[stone.pos[1] + this.fieldWidth] === 0 && this.field[stone.pos[1] + (2 * this.fieldWidth)] === 0) {
+                        stone.pos[0] = stone.pos[1] + this.fieldWidth;
+                        stone.pos[3] = stone.pos[0] + this.fieldWidth;
+                    } else if (stone.rotation === 2 && this.field[stone.pos[1] - 1] === 0 && this.field[stone.pos[1] - 2] === 0) {
+                        if (stone.pos[1] % this.fieldWidth === 0) {
+                            stone.pos[0] += 2;
+                            stone.pos[1] += 2;
+                        } else if (stone.pos[1] % this.fieldWidth === 1) {
+                            stone.pos[0]++;
+                            stone.pos[1]++;
                         }
-                        this.stones[userid].pos[3] = this.stones[userid].pos[1] - 1;
-                        this.stones[userid].pos[2] = this.stones[userid].pos[3] - 1;
-                    } else if (this.stones[userid].rotation === 3 && this.field[this.stones[userid].pos[1] - this.field_width] === 0 && this.field[this.stones[userid].pos[0] - (2 * this.field_width)] === 0) {
-                        this.stones[userid].pos[0] = this.stones[userid].pos[1] - this.field_width;
-                        this.stones[userid].pos[2] = this.stones[userid].pos[0] - this.field_width;
-                    } else if (this.stones[userid].rotation === 4 && this.field[this.stones[userid].pos[1] + 1] === 0 && this.field[this.stones[userid].pos[1] + 2] === 0) {
-                        if (this.stones[userid].pos[1] % this.field_width === (this.field_width-1)) {
-                            this.stones[userid].pos[0] -= 2;
-                            this.stones[userid].pos[1] -= 2;
-                        } else if (this.stones[userid].pos[1] % this.field_width === (this.field_width-2)) {
-                            this.stones[userid].pos[0]--;
-                            this.stones[userid].pos[1]--;
+                        stone.pos[3] = stone.pos[1] - 1;
+                        stone.pos[2] = stone.pos[3] - 1;
+                    } else if (stone.rotation === 3 && this.field[stone.pos[1] - this.fieldWidth] === 0 && this.field[stone.pos[0] - (2 * this.fieldWidth)] === 0) {
+                        stone.pos[0] = stone.pos[1] - this.fieldWidth;
+                        stone.pos[2] = stone.pos[0] - this.fieldWidth;
+                    } else if (stone.rotation === 4 && this.field[stone.pos[1] + 1] === 0 && this.field[stone.pos[1] + 2] === 0) {
+                        if (stone.pos[1] % this.fieldWidth === (this.fieldWidth-1)) {
+                            stone.pos[0] -= 2;
+                            stone.pos[1] -= 2;
+                        } else if (stone.pos[1] % this.fieldWidth === (this.fieldWidth-2)) {
+                            stone.pos[0]--;
+                            stone.pos[1]--;
                         }
-                        this.stones[userid].pos[2] = this.stones[userid].pos[1] + 1;
-                        this.stones[userid].pos[3] = this.stones[userid].pos[1] + 2;
+                        stone.pos[2] = stone.pos[1] + 1;
+                        stone.pos[3] = stone.pos[1] + 2;
                     } else {
                         break;
                     }
-                    this.stones[userid].rotation === 4 ? this.stones[userid].rotation = 1 : this.stones[userid].rotation++;
+                    stone.rotation === 4 ? stone.rotation = 1 : stone.rotation++;
                     break;
                 case 7: // L
-                    if (this.stones[userid].rotation === 1 && this.field[this.stones[userid].pos[0] - 1] === 0 && this.field[this.stones[userid].pos[3] + this.field_width] === 0) {
-                        if (this.stones[userid].pos[0] % this.field_width === 0) {
-                            this.stones[userid].pos[0]++;
+                    if (stone.rotation === 1 && this.field[stone.pos[0] - 1] === 0 && this.field[stone.pos[3] + this.fieldWidth] === 0) {
+                        if (stone.pos[0] % this.fieldWidth === 0) {
+                            stone.pos[0]++;
                         }
-                        this.stones[userid].pos[1] = this.stones[userid].pos[0] - 1;
-                        this.stones[userid].pos[2] = this.stones[userid].pos[0] + this.field_width;
-                        this.stones[userid].pos[3] = this.stones[userid].pos[2] + this.field_width;
-                    } else if (this.stones[userid].rotation === 2 && this.field[this.stones[userid].pos[1] - 1] === 0 && this.field[this.stones[userid].pos[0] - this.field_width] === 0) {
-                        if (this.stones[userid].pos[1] % this.field_width === 0) {
-                            this.stones[userid].pos[0]++;
-                            this.stones[userid].pos[1]++;
+                        stone.pos[1] = stone.pos[0] - 1;
+                        stone.pos[2] = stone.pos[0] + this.fieldWidth;
+                        stone.pos[3] = stone.pos[2] + this.fieldWidth;
+                    } else if (stone.rotation === 2 && this.field[stone.pos[1] - 1] === 0 && this.field[stone.pos[0] - this.fieldWidth] === 0) {
+                        if (stone.pos[1] % this.fieldWidth === 0) {
+                            stone.pos[0]++;
+                            stone.pos[1]++;
                         }
-                        this.stones[userid].pos[2] = this.stones[userid].pos[0] - this.field_width;
-                        this.stones[userid].pos[3] = this.stones[userid].pos[1] - 1;
-                    } else if (this.stones[userid].rotation === 3 && this.field[this.stones[userid].pos[2] - this.field_width] === 0 && this.field[this.stones[userid].pos[0] + 1] === 0) {
-                        if (this.stones[userid].pos[0] % this.field_width == (this.field_width-1)) {
-                            this.stones[userid].pos[0]--;
+                        stone.pos[2] = stone.pos[0] - this.fieldWidth;
+                        stone.pos[3] = stone.pos[1] - 1;
+                    } else if (stone.rotation === 3 && this.field[stone.pos[2] - this.fieldWidth] === 0 && this.field[stone.pos[0] + 1] === 0) {
+                        if (stone.pos[0] % this.fieldWidth == (this.fieldWidth-1)) {
+                            stone.pos[0]--;
                         }
-                        this.stones[userid].pos[1] = this.stones[userid].pos[0] + 1;
-                        this.stones[userid].pos[2] = this.stones[userid].pos[0] - this.field_width;
-                        this.stones[userid].pos[3] = this.stones[userid].pos[2] - this.field_width;
-                    } else if (this.stones[userid].rotation === 4 && this.field[this.stones[userid].pos[1] + 1] === 0 && this.field[this.stones[userid].pos[0] + this.field_width] === 0) {
-                        if (this.stones[userid].pos[1] % this.field_width === (this.field_width-1)) {
-                            this.stones[userid].pos[0]--;
-                            this.stones[userid].pos[1] --;
+                        stone.pos[1] = stone.pos[0] + 1;
+                        stone.pos[2] = stone.pos[0] - this.fieldWidth;
+                        stone.pos[3] = stone.pos[2] - this.fieldWidth;
+                    } else if (stone.rotation === 4 && this.field[stone.pos[1] + 1] === 0 && this.field[stone.pos[0] + this.fieldWidth] === 0) {
+                        if (stone.pos[1] % this.fieldWidth === (this.fieldWidth-1)) {
+                            stone.pos[0]--;
+                            stone.pos[1] --;
                         }
-                        this.stones[userid].pos[2] = this.stones[userid].pos[1] + 1;
-                        this.stones[userid].pos[3] = this.stones[userid].pos[0] + this.field_width;
+                        stone.pos[2] = stone.pos[1] + 1;
+                        stone.pos[3] = stone.pos[0] + this.fieldWidth;
                     } else {
                         break;
                     }
-                    this.stones[userid].rotation === 4 ? this.stones[userid].rotation = 1 : this.stones[userid].rotation++;
+                    stone.rotation === 4 ? stone.rotation = 1 : stone.rotation++;
                     break;
                 case 8: // kleines L
-                    if (this.stones[userid].rotation === 1 && this.field[this.stones[userid].pos[0] - 1] === 0) {
-                        if (this.stones[userid].pos[0] % this.field_width === 0) {
-                            this.stones[userid].pos[0]++;
+                    if (stone.rotation === 1 && this.field[stone.pos[0] - 1] === 0) {
+                        if (stone.pos[0] % this.fieldWidth === 0) {
+                            stone.pos[0]++;
                         }
-                        this.stones[userid].pos[1] = this.stones[userid].pos[0] - 1;
-                    } else if (this.stones[userid].rotation === 2 && this.field[this.stones[userid].pos[0] - this.field_width] === 0) {
-                        this.stones[userid].pos[2] = this.stones[userid].pos[0] - this.field_width;
-                    } else if (this.stones[userid].rotation === 3 && this.field[this.stones[userid].pos[0] + 1] === 0) {
-                        if (this.stones[userid].pos[0] % this.field_width === (this.field_width-1)) {
-                            this.stones[userid].pos[0]--;
-                            this.stones[userid].pos[2]--;
+                        stone.pos[1] = stone.pos[0] - 1;
+                    } else if (stone.rotation === 2 && this.field[stone.pos[0] - this.fieldWidth] === 0) {
+                        stone.pos[2] = stone.pos[0] - this.fieldWidth;
+                    } else if (stone.rotation === 3 && this.field[stone.pos[0] + 1] === 0) {
+                        if (stone.pos[0] % this.fieldWidth === (this.fieldWidth-1)) {
+                            stone.pos[0]--;
+                            stone.pos[2]--;
                         }
-                        this.stones[userid].pos[1] = this.stones[userid].pos[0] + 1;
-                    } else if (this.stones[userid].rotation === 4 && this.field[this.stones[userid].pos[0] + this.field_width] === 0) {
-                        this.stones[userid].pos[2] = this.stones[userid].pos[0] + this.field_width;
+                        stone.pos[1] = stone.pos[0] + 1;
+                    } else if (stone.rotation === 4 && this.field[stone.pos[0] + this.fieldWidth] === 0) {
+                        stone.pos[2] = stone.pos[0] + this.fieldWidth;
                     } else {
                         break;
                     }
-                    this.stones[userid].rotation === 4 ? this.stones[userid].rotation = 1 : this.stones[userid].rotation++;
+                    stone.rotation === 4 ? stone.rotation = 1 : stone.rotation++;
                     break;
                 case 9: // S
-                    if (this.stones[userid].rotation === 1 && this.field[this.stones[userid].pos[2] + 2] === 0 && this.field[this.stones[userid].pos[3] - 2 * this.field_width] === 0) {
-                        this.stones[userid].pos[2] += 2;
-                        this.stones[userid].pos[3] -= 2 * this.field_width;
-                        this.stones[userid].rotation = 2;
-                    } else if (this.stones[userid].rotation === 2 && this.field[this.stones[userid].pos[2] - 2] === 0 && this.field[this.stones[userid].pos[3] + 2 * this.field_width] === 0) {
-                        this.stones[userid].pos[2] -= 2;
-                        this.stones[userid].pos[3] += 2 * this.field_width;
-                        this.stones[userid].rotation = 1;
+                    if (stone.rotation === 1 && this.field[stone.pos[2] + 2] === 0 && this.field[stone.pos[3] - 2 * this.fieldWidth] === 0) {
+                        stone.pos[2] += 2;
+                        stone.pos[3] -= 2 * this.fieldWidth;
+                        stone.rotation = 2;
+                    } else if (stone.rotation === 2 && this.field[stone.pos[2] - 2] === 0 && this.field[stone.pos[3] + 2 * this.fieldWidth] === 0) {
+                        stone.pos[2] -= 2;
+                        stone.pos[3] += 2 * this.fieldWidth;
+                        stone.rotation = 1;
                     } break;
                 case 10: // Z
-                    if (this.stones[userid].rotation === 1 && this.field[this.stones[userid].pos[0] + 2] === 0 && this.field[this.stones[userid].pos[1] + 2 * this.field_width] === 0) {
-                        this.stones[userid].pos[0] += 2;
-                        this.stones[userid].pos[1] += 2 * this.field_width;
-                        this.stones[userid].rotation = 2;
-                    } else if (this.stones[userid].rotation === 2 && this.field[this.stones[userid].pos[0] - 2] === 0 && this.field[this.stones[userid].pos[1] - 2 * this.field_width] === 0) {
-                        this.stones[userid].pos[0] -= 2;
-                        this.stones[userid].pos[1] -= 2 * this.field_width;
-                        this.stones[userid].rotation = 1;
+                    if (stone.rotation === 1 && this.field[stone.pos[0] + 2] === 0 && this.field[stone.pos[1] + 2 * this.fieldWidth] === 0) {
+                        stone.pos[0] += 2;
+                        stone.pos[1] += 2 * this.fieldWidth;
+                        stone.rotation = 2;
+                    } else if (stone.rotation === 2 && this.field[stone.pos[0] - 2] === 0 && this.field[stone.pos[1] - 2 * this.fieldWidth] === 0) {
+                        stone.pos[0] -= 2;
+                        stone.pos[1] -= 2 * this.fieldWidth;
+                        stone.rotation = 1;
                     } break;
                 default: break;
             }
         // Move Left (A)
-        } else if (key === 65) {
-            var setzen = true;
-            for (i = 0; i < 4 && this.stones[userid].pos[i] !== -1; i++) {
-                if (this.stones[userid].pos[i] - 1 < 0 || this.field[this.stones[userid].pos[i] - 1] > 0 ||
-                    this.stones[userid].pos[i] % this.field_width < (this.stones[userid].pos[i] - 1) % this.field_width)
+        } else if (key === KEYS.moveLeft) {
+            let setzen = true;
+            for (let i = 0; i < 4 && this.stones[userid].pos[i] !== -1; i++) {
+                if (this.stones[userid].pos[i] - 1 < 0 ||
+                    this.field[this.stones[userid].pos[i] - 1] > 0 ||
+                    this.stones[userid].pos[i] % this.fieldWidth < (this.stones[userid].pos[i] - 1) % this.fieldWidth)
                     setzen = false;
             }
             if (setzen) {
-                for (i = 0; i < 4; i++) {
-                    if (this.stones[userid].pos[i] >= 0)
-                        this.stones[userid].pos[i]--;
-                }
+                this.stones[userid].left();
             }
+
         // Move Right (D)
-        } else if (key === 68) {
-            var setzen = true;
-            for (i = 0; i < 4 && this.stones[userid].pos[i] !== -1; i++) {
-                if (this.stones[userid].pos[i] + 1 > this.field.length || this.field[this.stones[userid].pos[i] + 1] > 0 ||
-                    this.stones[userid].pos[i] % this.field_width > (this.stones[userid].pos[i] + 1) % this.field_width)
+        } else if (key === KEYS.moveRight) {
+            let setzen = true;
+            for (let i = 0; i < 4 && this.stones[userid].pos[i] !== -1; i++) {
+                if (this.stones[userid].pos[i] + 1 > this.field.length ||
+                    this.field[this.stones[userid].pos[i] + 1] > 0 ||
+                    this.stones[userid].pos[i] % this.fieldWidth > (this.stones[userid].pos[i] + 1) % this.fieldWidth)
                     setzen = false;
             }
             if (setzen) {
-                for (i = 0; i < 4 && this.stones[userid].pos[i] !== -1; i++) {
-                    this.stones[userid].pos[i]++;
-                }
+                this.stones[userid].right();
             }
         // Move Down (S)
-        } else if (key === 83) {
-            var setzen = true;
-            for (i = 0; i < 4 && this.stones[userid].pos[i] !== -1; i++) {
-                if (this.stones[userid].pos[i] + this.field_width >= (this.field.length - this.field_width) ||
-                    this.field[this.stones[userid].pos[i] + this.field_width] > 0) {
+        } else if (key === KEYS.moveDown) {
+            let setzen = true;
+            for (let i = 0; i < 4 && this.stones[userid].pos[i] !== -1; i++) {
+                if (this.stones[userid].pos[i] + this.fieldWidth >= (this.field.length - this.fieldWidth) ||
+                    this.field[this.stones[userid].pos[i] + this.fieldWidth] > 0) {
                     setzen = false;
                 }
             }
             if (setzen) {
-                for (i = 0; i < 4 && this.stones[userid].pos[i] !== -1; i++) {
-                    this.stones[userid].pos[i] += this.field_width;
-                }
+                this.stones[userid].down(this.fieldWidth);
             }
         }
     }
 
-    this.gamelogic = function() {
+    gamelogic() {
         if (!this.gameOver && !this.paused) {
-            // Check if the player's stones reached the bottom
-            for (j = 0; j < this.stones.length && !this.isGameOver(); j++) {
-                for (i = 0; i < 4 && this.stones[j].pos[i] !== -1; i++) {
-                    // Check if the player's stone is in the last row or one before that and there
+            // check if the player's stones reached the bottom
+            for (let j = 0; j < this.stones.length && !this.isGameOver(); j++) {
+                for (let i = 0; i < 4 && this.stones[j].pos[i] !== -1; i++) {
+                    // check if the player's stone is in the last row or one before that and there
                     // is no free space under his stone
-                    if ((this.stones[j].pos[i] < (this.field.length - this.field_width) &&
-                         this.field[this.stones[j].pos[i] + this.field_width] > 0) ||
-                         this.stones[j].pos[i] >= (this.field.length - this.field_width)) {
+                    if ((this.stones[j].pos[i] < (this.field.length - this.fieldWidth) &&
+                         this.field[this.stones[j].pos[i] + this.fieldWidth] > 0) ||
+                         this.stones[j].pos[i] >= (this.field.length - this.fieldWidth)) {
                         this.setStaticStone(j);
                         this.stonefinished(j);
                         break;
@@ -994,12 +1120,13 @@ module.exports.room = function() {
         }
     }
 
-    this.isGameOver = function() {
+    isGameOver() {
         // Check if stones are so high the game is over
-        for (i = 0; i < this.field_width; i++) {
+        for (let i = 0; i < this.fieldWidth; i++) {
             if (this.field[i] > 0) {
                 this.gameOver = true;
                 this.gameStarted = false;
+                this.paused = false;
                 this.callGameOverCallback();
                 return true;
             }
@@ -1007,23 +1134,24 @@ module.exports.room = function() {
         return false;
     }
 
-    this.dropStones = function() {
+    dropStones() {
         if (!this.gameOver && !this.paused) {
-            for (j = 0; j < this.stones.length && !this.isGameOver(); j++) {
-                var setzen = true;
-                for (i = 0; i < 4 && this.stones[j].pos[i] !== -1; i++) {
-                    if (this.field[this.stones[j].pos[i] + this.field_width] > 0 ||
-                        this.field[this.stones[j].pos[i]] + this.field_width >= this.field.length) {
+            for (let j = 0; j < this.stones.length && !this.isGameOver(); j++) {
+                let setzen = true;
+                for (let i = 0; i < 4 && this.stones[j].pos[i] !== -1; i++) {
+                    if (this.field[this.stones[j].pos[i] + this.fieldWidth] > 0 ||
+                        this.field[this.stones[j].pos[i]] + this.fieldWidth >= this.field.length) {
                         setzen = false;
                     }
                 }
                 if (setzen) {
-                    var setStatic = false;
-                    for (i = 0; i < 4 && this.stones[j].pos[i] !== -1; i++) {
-                        this.stones[j].pos[i] += this.field_width;
+                    for (let i = 0; i < 4 && this.stones[j].pos[i] !== -1; i++) {
+                        this.stones[j].pos[i] += this.fieldWidth;
                     }
                 }
             }
         }
     }
 };
+
+module.exports = Room;
